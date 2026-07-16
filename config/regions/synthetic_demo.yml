@@ -1,0 +1,35 @@
+region_id: synthetic_demo
+region_name: Synthetic Demo Island
+country: SYNTHETIC
+analysis_crs: EPSG:3857
+output_crs: EPSG:4326
+inputs:
+  land_polygon:
+    path: data/fixtures/synthetic_demo/land.geojson
+    source_id: synthetic_demo_land
+  elevation:
+    path: data/fixtures/synthetic_demo/dem.tif
+    source_id: synthetic_demo_dem
+coastline:
+  target_segment_length_m: 250
+  minimum_segment_length_m: 75
+  simplification_tolerance_m: 0
+  orientation_test_distance_m: 10
+  orientation_fallback_distances_m: [20, 40]
+  include_interior_shorelines: false
+transects:
+  spacing_m: 25
+  inland_length_m: 100
+  offshore_length_m: 200
+terrain:
+  relief_distances_m: [25, 50, 100]
+  sample_spacing_m: 5
+  steep_slope_threshold_degrees: 35
+  roughness_window_m: 15
+  minimum_valid_sample_share: 0.7
+  write_samples: true
+quality:
+  maximum_ambiguous_orientation_share: 0.02
+  maximum_missing_terrain_share: 0.05
+  random_qa_sample_size: 12
+

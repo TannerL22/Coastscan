@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "land",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::3857" } },
+"features": [
+{ "type": "Feature", "properties": { "fixture": "synthetic_rectangular_island" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 1000.0, 0.0 ], [ 1000.0, 500.0 ], [ 0.0, 500.0 ], [ 0.0, 0.0 ], [ 1000.0, 0.0 ] ] ] } }
+]
+}

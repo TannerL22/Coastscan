@@ -1,0 +1,6 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: CoastScan region configuration
+description: Informative schema; runtime validation is implemented by Pydantic.
+type: object
+required: [region_id, region_name, country, analysis_crs, output_crs, inputs, coastline, transects, terrain, quality]
+
