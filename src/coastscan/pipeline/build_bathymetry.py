@@ -14,7 +14,12 @@ import numpy as np
 
 from coastscan import __version__
 from coastscan.bathymetry.features import calculate_bathymetry_features
-from coastscan.bathymetry.prepare import inspect_bathymetry_source, prepare_bathymetry
+from coastscan.bathymetry.prepare import (
+    bathymetry_cache_key,
+    inspect_bathymetry_source,
+    prepare_bathymetry,
+    valid_bathymetry_cache_exists,
+)
 from coastscan.bathymetry.qa import generate_bathymetry_maps, run_bathymetry_qa
 from coastscan.bathymetry.sampling import sample_bathymetry
 from coastscan.bathymetry.transects import generate_bathymetry_transects
@@ -78,7 +83,6 @@ def inspect_bathymetry(region: str | Path, root: Path = PROJECT_ROOT) -> dict[st
     segments = gpd.read_parquet(segment_path)
     details = inspect_bathymetry_source(config, segments, root)
     segment_checksum = sha256_file(segment_path)
-    cache_root = root / "data" / "interim" / config.region_id / "bathymetry_cache"
     details.update(
         {
             "configuration_path": _relative(config_path, root),
@@ -87,7 +91,8 @@ def inspect_bathymetry(region: str | Path, root: Path = PROJECT_ROOT) -> dict[st
             "upstream_segment_id_set_checksum": sha256_text(
                 "\n".join(sorted(segments.segment_id.astype(str)))
             ),
-            "valid_bathymetry_cache_exists": any(cache_root.glob("*/metadata.json")),
+            "bathymetry_cache_key": bathymetry_cache_key(config, segments, root),
+            "valid_bathymetry_cache_exists": valid_bathymetry_cache_exists(config, segments, root),
         }
     )
     return details

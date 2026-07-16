@@ -64,6 +64,47 @@ def _canonical_mapping(config: RegionConfig) -> dict[str, str]:
     return {names[key]: value for key, value in raw.items() if value is not None}
 
 
+def bathymetry_cache_key(config: RegionConfig, segments: gpd.GeoDataFrame, root: Path) -> str:
+    """Return the deterministic current cache key without creating cache files."""
+    source = config.inputs.bathymetry
+    settings = config.bathymetry
+    assert source is not None and settings is not None
+    path = data_path(source.path, root)
+    mapping = _canonical_mapping(config)
+    relevant = {
+        "source_checksum": sha256_file(path),
+        "adapter": source.source_adapter,
+        "adapter_version": ADAPTER_VERSION,
+        "mapping": mapping,
+        "segments_bounds": [round(float(value), 3) for value in segments.total_bounds],
+        "upstream_segments": sha256_text(
+            "\n".join(
+                f"{segment_id}:{geometry.hex()}"
+                for segment_id, geometry in zip(
+                    segments.segment_id.astype(str), segments.geometry.to_wkb(), strict=True
+                )
+            )
+        ),
+        "analysis_crs": config.analysis_crs,
+        "settings": settings.model_dump(mode="json"),
+        "native_resolution_m": source.native_resolution_m,
+        "sign": source.depth_sign_convention,
+        "zero_is_valid": source.zero_is_valid,
+    }
+    return sha256_text(json.dumps(relevant, sort_keys=True))[:16]
+
+
+def valid_bathymetry_cache_exists(
+    config: RegionConfig, segments: gpd.GeoDataFrame, root: Path
+) -> bool:
+    key = bathymetry_cache_key(config, segments, root)
+    cache_dir = root / "data" / "interim" / config.region_id / "bathymetry_cache" / key
+    mapping = _canonical_mapping(config)
+    return (cache_dir / "metadata.json").is_file() and all(
+        (cache_dir / f"{name}.tif").is_file() for name in mapping
+    )
+
+
 def _source_metadata(
     path: Path, mean_variable: str
 ) -> tuple[str, Affine, tuple[float, ...], dict[str, Any]]:
@@ -164,27 +205,7 @@ def prepare_bathymetry(
     mapping = _canonical_mapping(config)
     source_crs, src_transform, src_bounds, _ = _source_metadata(path, source.variables.mean_depth)
     source_checksum = sha256_file(path)
-    relevant = {
-        "source_checksum": source_checksum,
-        "adapter": source.source_adapter,
-        "adapter_version": ADAPTER_VERSION,
-        "mapping": mapping,
-        "segments_bounds": [round(float(value), 3) for value in segments.total_bounds],
-        "upstream_segments": sha256_text(
-            "\n".join(
-                f"{segment_id}:{geometry.hex()}"
-                for segment_id, geometry in zip(
-                    segments.segment_id.astype(str), segments.geometry.to_wkb(), strict=True
-                )
-            )
-        ),
-        "analysis_crs": config.analysis_crs,
-        "settings": settings.model_dump(mode="json"),
-        "native_resolution_m": source.native_resolution_m,
-        "sign": source.depth_sign_convention,
-        "zero_is_valid": source.zero_is_valid,
-    }
-    cache_key = sha256_text(json.dumps(relevant, sort_keys=True))[:16]
+    cache_key = bathymetry_cache_key(config, segments, root)
     cache_dir = root / "data" / "interim" / config.region_id / "bathymetry_cache" / cache_key
     metadata_path = cache_dir / "metadata.json"
     paths = {name: cache_dir / f"{name}.tif" for name in mapping}
