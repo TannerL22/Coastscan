@@ -6,6 +6,9 @@ __pycache__/
 .ruff_cache/
 .uv-cache/
 .matplotlib/
+.streamlit/cache/
+.streamlit/secrets.toml
+.env
 dist/
 data/raw/**
 data/interim/**

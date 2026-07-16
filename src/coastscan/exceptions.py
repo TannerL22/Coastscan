@@ -31,3 +31,7 @@ class QualityThresholdError(CoastScanError):
 
 class AcquisitionError(CoastScanError):
     """Authoritative source discovery, download, or validation failed."""
+
+
+class ViewerError(CoastScanError):
+    """Processed viewer inputs or local application startup are invalid."""
