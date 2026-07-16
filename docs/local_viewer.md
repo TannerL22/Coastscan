@@ -118,4 +118,3 @@ Terrain is terrestrial only. Regional bathymetry does not measure water beneath 
 EMODnet is not navigation data, coarse cells may contain fallback or interpolated evidence, submerged
 obstacles are unresolved and conditions change over time. Exact sites require legal, environmental and
 physical assessment. No overall exploration, jumping or safety score exists.
-
