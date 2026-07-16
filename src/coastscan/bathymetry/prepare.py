@@ -64,6 +64,12 @@ def _canonical_mapping(config: RegionConfig) -> dict[str, str]:
     return {names[key]: value for key, value in raw.items() if value is not None}
 
 
+def _transect_origin_count(length: float, spacing: float) -> int:
+    origins = np.arange(0.0, length, spacing)
+    include_end = not len(origins) or length - origins[-1] > spacing * 0.5
+    return len(origins) + int(include_end)
+
+
 def bathymetry_cache_key(config: RegionConfig, segments: gpd.GeoDataFrame, root: Path) -> str:
     """Return the deterministic current cache key without creating cache files."""
     source = config.inputs.bathymetry
@@ -176,14 +182,12 @@ def inspect_bathymetry_source(
         "higher_resolution_source_assessment": source.higher_resolution_assessment,
         "estimated_bathymetry_transect_count": int(
             sum(
-                len(np.arange(0.0, float(length), settings.transect_spacing_m))
-                + int(
-                    not len(np.arange(0.0, float(length), settings.transect_spacing_m))
-                    or float(length)
-                    - np.arange(0.0, float(length), settings.transect_spacing_m)[-1]
-                    > settings.transect_spacing_m * 0.5
-                )
-                for length in segments.length
+                _transect_origin_count(float(length), settings.transect_spacing_m)
+                for length in segments.loc[
+                    (segments.orientation_status != "ambiguous")
+                    & np.isfinite(segments.seaward_bearing_deg),
+                    "geometry",
+                ].length
             )
         ),
     }

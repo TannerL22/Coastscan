@@ -33,7 +33,7 @@ def run_bathymetry_qa(
     checks["transect_lengths_match"] = bool(
         np.allclose(transects.length, settings.maximum_offshore_distance_m, atol=0.01)
     )
-    ambiguous_ids = set(segments.loc[segments.orientation_status != "resolved", "segment_id"])
+    ambiguous_ids = set(segments.loc[segments.orientation_status == "ambiguous", "segment_id"])
     checks["no_transects_for_ambiguous_orientation"] = not bool(
         set(transects.segment_id) & ambiguous_ids
     )

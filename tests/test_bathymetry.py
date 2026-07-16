@@ -155,6 +155,11 @@ def test_bathymetry_transects_are_stable_and_skip_ambiguous() -> None:
     assert np.allclose(first.length, 500)
     assert np.allclose(first.bearing_deg, 180)
 
+    segments.loc[1, "orientation_status"] = "resolved_fallback"
+    segments.loc[1, "seaward_bearing_deg"] = 180.0
+    with_fallback = generate_bathymetry_transects(segments, spacing_m=50, maximum_distance_m=500)
+    assert set(with_fallback.segment_id) == {"resolved", "ambiguous"}
+
 
 def test_feature_aggregation_known_gradient_and_contour(
     synthetic_bathymetry_project: Path,

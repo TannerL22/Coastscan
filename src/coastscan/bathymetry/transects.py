@@ -23,7 +23,9 @@ def generate_bathymetry_transects(
 ) -> gpd.GeoDataFrame:
     rows: list[dict[str, object]] = []
     for segment in segments.sort_values("segment_id").itertuples():
-        if segment.orientation_status != "resolved" or not np.isfinite(segment.seaward_bearing_deg):
+        if segment.orientation_status == "ambiguous" or not np.isfinite(
+            segment.seaward_bearing_deg
+        ):
             continue
         geometry = segment.geometry
         origins = list(np.arange(0.0, geometry.length, spacing_m))
