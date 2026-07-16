@@ -3,4 +3,13 @@ title: CoastScan region configuration
 description: Informative schema; runtime validation is implemented by Pydantic.
 type: object
 required: [region_id, region_name, country, analysis_crs, output_crs, inputs, coastline, transects, terrain, quality]
-
+properties:
+  bathymetry:
+    description: Optional Phase 2 settings; requires inputs.bathymetry.
+    type: object
+  inputs:
+    type: object
+    properties:
+      bathymetry:
+        description: Optional typed source and canonical variable mapping.
+        type: object

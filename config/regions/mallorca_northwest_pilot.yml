@@ -85,6 +85,25 @@ inputs:
       - data/raw/elevation/mdt02/MDT02-ETRS89-HU31-0670-2-COB2.TIF
     mosaic_mode: vrt
     vertical_units: metres
+  bathymetry:
+    source_id: emodnet_dtm_2024_lat
+    path: data/raw/bathymetry/emodnet_dtm_2024/mallorca_northwest_subset.nc
+    source_adapter: emodnet
+    source_release: "2024"
+    vertical_datum: LAT
+    depth_sign_convention: negative_elevation
+    native_resolution_m: 115
+    zero_is_valid: true
+    screening_class_ceiling: background_only
+    higher_resolution_assessment: No public EMODnet HR-DTM intersects the pilot AOI (WFS assessment 2026-07-16).
+    variables:
+      mean_depth: elevation
+      minimum_depth: elevation_max
+      maximum_depth: elevation_min
+      standard_deviation: stdev
+      observation_count: value_count
+      interpolation_flag: interpolation_flag
+      source_reference: cdi_index
 area_of_interest:
   path: data/raw/boundaries/mallorca_northwest_aoi.gpkg
   layer: aoi
@@ -113,3 +132,17 @@ quality:
   maximum_ambiguous_orientation_share: 0.02
   maximum_missing_terrain_share: 0.05
   random_qa_sample_size: 50
+bathymetry:
+  target_distances_m: [100, 250, 500, 1000]
+  maximum_offshore_distance_m: 1200
+  transect_spacing_m: 50
+  continuous_sample_spacing_m: 50
+  first_valid_search_max_distance_m: 400
+  contour_depths_m: [5, 10, 20, 30]
+  minimum_valid_transect_share: 0.6
+  minimum_resolution_ratio: 1.0
+  large_coastal_gap_threshold_m: 200
+  shallow_platform_distance_m: 500
+  shallow_platform_depth_m: 10
+  shallow_platform_minimum_share: 0.6
+  write_samples: true

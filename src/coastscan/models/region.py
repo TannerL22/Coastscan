@@ -85,10 +85,56 @@ class RasterInput(StrictModel):
         return self
 
 
+class BathymetryVariables(StrictModel):
+    mean_depth: str
+    minimum_depth: str | None = None
+    maximum_depth: str | None = None
+    standard_deviation: str | None = None
+    observation_count: str | None = None
+    interpolation_flag: str | None = None
+    source_reference: str | None = None
+    quality_index: str | None = None
+
+    @field_validator("mean_depth")
+    @classmethod
+    def nonempty_mean_depth(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("mean_depth variable cannot be empty")
+        return value
+
+
+class BathymetryInput(StrictModel):
+    source_id: str
+    path: Path
+    source_adapter: Literal["emodnet", "generic"]
+    source_release: str
+    vertical_datum: str
+    depth_sign_convention: Literal["positive_down", "negative_elevation"]
+    native_resolution_m: float = Field(gt=0)
+    variables: BathymetryVariables
+    zero_is_valid: bool = True
+    screening_class_ceiling: Literal[
+        "local_morphology_candidate",
+        "coastal_context",
+        "regional_screening",
+        "background_only",
+        "insufficient",
+    ] = "regional_screening"
+    higher_resolution_assessment: str
+
+    @field_validator("vertical_datum", "source_release", "higher_resolution_assessment")
+    @classmethod
+    def required_metadata(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("bathymetry source metadata must be explicit")
+        return value
+
+
 class InputsConfig(StrictModel):
     coastline: DirectCoastlineInput | None = None
     land_polygon: VectorInput | None = None
     elevation: RasterInput
+    bathymetry: BathymetryInput | None = None
 
     @model_validator(mode="after")
     def coastline_contract(self) -> "InputsConfig":
@@ -155,6 +201,41 @@ class QualityConfig(StrictModel):
     random_qa_sample_size: int = Field(gt=0)
 
 
+class BathymetryConfig(StrictModel):
+    target_distances_m: list[float]
+    maximum_offshore_distance_m: float = Field(gt=0)
+    transect_spacing_m: float = Field(gt=0)
+    continuous_sample_spacing_m: float = Field(gt=0)
+    first_valid_search_max_distance_m: float = Field(gt=0)
+    contour_depths_m: list[float]
+    minimum_valid_transect_share: float = Field(ge=0, le=1)
+    minimum_resolution_ratio: float = Field(default=1.0, gt=0)
+    large_coastal_gap_threshold_m: float = Field(default=200.0, gt=0)
+    shallow_platform_distance_m: float = Field(default=500.0, gt=0)
+    shallow_platform_depth_m: float = Field(default=10.0, gt=0)
+    shallow_platform_minimum_share: float = Field(default=0.6, ge=0, le=1)
+    write_samples: bool = False
+
+    @field_validator("target_distances_m", "contour_depths_m")
+    @classmethod
+    def positive_sorted_unique(cls, value: list[float]) -> list[float]:
+        if not value or any(item <= 0 for item in value):
+            raise ValueError("must contain positive values")
+        if value != sorted(set(value)):
+            raise ValueError("must be sorted with no duplicates")
+        return value
+
+    @model_validator(mode="after")
+    def distances_within_transect(self) -> "BathymetryConfig":
+        if max(self.target_distances_m) > self.maximum_offshore_distance_m:
+            raise ValueError("maximum_offshore_distance_m must cover every target distance")
+        if self.first_valid_search_max_distance_m > self.maximum_offshore_distance_m:
+            raise ValueError("first-valid search cannot exceed maximum offshore distance")
+        if self.shallow_platform_distance_m > self.maximum_offshore_distance_m:
+            raise ValueError("shallow-platform distance cannot exceed maximum offshore distance")
+        return self
+
+
 class RegionConfig(StrictModel):
     region_id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]*$")
     region_name: str
@@ -167,6 +248,7 @@ class RegionConfig(StrictModel):
     transects: TransectConfig
     terrain: TerrainConfig
     quality: QualityConfig
+    bathymetry: BathymetryConfig | None = None
 
     @field_validator("analysis_crs", "output_crs")
     @classmethod
@@ -186,4 +268,6 @@ class RegionConfig(StrictModel):
             raise ValueError("analysis_crs must be projected with metre units")
         if max(self.terrain.relief_distances_m) > self.transects.inland_length_m:
             raise ValueError("relief distances cannot exceed inland transect length")
+        if (self.inputs.bathymetry is None) != (self.bathymetry is None):
+            raise ValueError("inputs.bathymetry and bathymetry must be configured together")
         return self
