@@ -1,129 +1,128 @@
 # CoastScan
 
-CoastScan Phase 1/1.5 is a reproducible GIS pipeline that turns configured coastline, land-mask,
-and elevation sources into cleaned coastline parts, stable approximately 250 m segments,
-landward/offshore transects, terrestrial morphology features, run manifests, and QA artefacts.
+CoastScan is a reproducible GIS pipeline with separate terrestrial and bathymetry stages. Phase 1
+turns configured coastline, land-mask and elevation sources into stable coastline segments and
+terrestrial morphology. Phase 2 adds resolution-aware regional offshore morphology without changing
+the Phase 1 contracts.
 
 ## Safety and uncertainty
 
 CoastScan identifies areas for further desktop and field investigation. It is not a safety
-certification or a recommendation that any location is safe. Terrain data does not resolve water
-depth, submerged rocks, ledges, or trajectories. Offshore transects are analytical geometry only.
-Exact locations require legal, environmental, and physical site assessment. Conditions can change
-with tides, waves, erosion, rockfall, and sediment movement.
+certification or a recommendation that any location is safe. Terrain and regional bathymetry do not
+resolve current water depth, submerged rocks, ledges or trajectories. The EMODnet product is not
+navigation data. Exact locations require legal, environmental and physical site assessment; tides,
+waves, erosion, rockfall and sediment movement can change conditions.
 
-## Phase 1 scope
+## Implemented scope
 
-Implemented: configuration validation, polygon-derived and direct-line coastline modes, a separate
-land-orientation mask, conservative cleaning, stable segmentation, multi-point orientation voting,
-transects, windowed multi-tile DEM validation/reprojection/cache, nodata-aware slope and roughness,
-nearest-valid-inland terrain origins, segment features, provenance manifests, QA checks/maps/report,
-official-data acquisition metadata, and synthetic fixtures. Phase 1 does not include bathymetry,
-water clarity, satellite imagery, geology, waves,
-protected areas, access or exploration scoring, machine learning, or a public frontend.
+Phase 1 includes strict configuration, polygon-derived and authoritative direct-line coastline modes,
+a separate land-orientation mask, cleaning, stable segmentation, multi-point orientation voting,
+transects, windowed multi-tile DEM reprojection/cache, nodata-aware slope and roughness, terrain
+origins, segment features, manifests and QA.
+
+Phase 2 is an independent cached bathymetry stage. It consumes stable Phase 1 segments, prepares
+canonical positive-down depth rasters, creates separate long offshore transects, finds the first valid
+marine cell and calculates target-distance depths, regional gradients, contour-distance proxies,
+source/quality summaries and transparent usability classes. It never overwrites Phase 1
+`segment_features.parquet`.
+
+The bathymetry hierarchy is: public authoritative high-resolution data where it genuinely overlaps;
+the latest stable EMODnet regional DTM as the mandatory baseline; lower-quality fallback cells retained
+with provenance; and a separate global grid only for a real uncovered gap. No public EMODnet HR-DTM
+intersects the Mallorca northwest pilot, so it uses EMODnet DTM 2024 LAT at about 115 m native spacing.
+A 100 m target is below native resolution; 250–1,000 m values remain regional proxies.
+
+Out of scope: water clarity, satellite-derived bathymetry generation, geology, waves, protected areas,
+access, exploration scoring, machine learning, frontend work and site-safety conclusions.
 
 ## Install
 
 Python 3.12 and `uv` are required.
 
 ```bash
-uv sync
+uv sync --python 3.12
 uv run coastscan --help
 ```
 
-PowerShell uses the same commands. The verification environment is Python 3.12:
-
-```powershell
-uv sync --python 3.12
-uv run coastscan inspect-inputs --region synthetic_demo
-```
-
-## Coastline and terrain source architecture
-
-Region YAML lives under `config/regions/`. Existing regions can derive the coastline from a land
-polygon. The preferred production mode loads an authoritative line/multiline coastline directly;
-that geometry controls cleaning, IDs, bearings, origins, and length. A separate polygon is used only
-for land/sea orientation, QA, and coarse clipping. The administrative boundary never replaces an
-available direct coastline.
-
-Elevation can be one raster, explicit paths, a directory, or a glob. Tile headers are checked for
-CRS, resolution, nodata, transform, and vertical-unit consistency. Only processing-corridor tiles and
-windows are read; the deterministic first-valid overlap rule feeds a clipped cached raster and
-blockwise slope/roughness derivatives. All selected source checksums participate in the cache key.
-
 ## Mallorca northwest real pilot
 
-`mallorca_northwest_pilot` covers approximately 29.10 km of official natural high-water coastline from the
-Port de Sóller area through Cala Tuent to Sa Calobra. It uses the IHM/CNIG `Línea de costa` COSTA
-layer (`CIERRACOST=true`, `PLEAMAR=true`) limited to the natural `COALNE`, `COSTA_ESCARPADA`, and
-`ORILLA_ARENA` classes, the CNIG municipal dataset as orientation support, and two
-intersecting CNIG MDT02 second-coverage 2 m COG tiles. Raw downloads and generated rasters are ignored
-by Git; source metadata and checksums are retained in the acquisition manifest.
+`mallorca_northwest_pilot` covers approximately 29.10 km of official natural high-water coastline from
+the Port de Sóller area through Cala Tuent to Sa Calobra. Phase 1 uses the IHM/CNIG `Línea de costa`
+natural COSTA classes, the CNIG municipal dataset as orientation support and two CNIG MDT02
+second-coverage 2 m COG tiles. Phase 2 uses a checksum-pinned official EMODnet DTM 2024 LAT subset.
 
-Acquire or validate the required official files with:
+Acquire or validate the official resources with:
 
 ```bash
 uv run coastscan acquire-region-data --region mallorca_northwest_pilot
 ```
 
-The downloader uses the public CNIG catalogue workflow, validates checksums/archive integrity, uses
-safe partial files, and reuses matching downloads. If CNIG requires manual interaction, use the exact
-product references and filenames in `config/acquisitions/mallorca_northwest_pilot.json`, place them at
-the listed local paths, and rerun the command. It will validate rather than fabricate or substitute
-data. Full source details and attribution are in `docs/mallorca_phase1_data.md`.
+The provider-dispatched downloader preserves CNIG catalogue behavior and supports stable official
+HTTPS/EMODnet resources. It uses partial files and atomic completion, validates or calculates checksums,
+records retrieval metadata and reuses matching local files. It never bypasses approval restrictions.
+
+Source and attribution details are in:
+
+- `docs/mallorca_phase1_data.md`
+- `docs/mallorca_phase2_bathymetry_source_assessment.md`
+- `docs/mallorca_phase2_bathymetry.md`
 
 ## Commands
 
 ```bash
-uv run coastscan inspect-inputs --region mallorca_pilot
-uv run coastscan build-region --region mallorca_pilot --write-samples
-uv run python scripts/build_region.py --region mallorca_pilot
-
+# Phase 1 remains backward-compatible
 uv run coastscan inspect-inputs --region mallorca_northwest_pilot
 uv run coastscan build-region --region mallorca_northwest_pilot --force --write-samples
+
+# Independent Phase 2
+uv run coastscan inspect-bathymetry --region mallorca_northwest_pilot
+uv run coastscan build-bathymetry --region mallorca_northwest_pilot --force --write-samples
+uv run coastscan build-bathymetry --region mallorca_northwest_pilot --write-samples
 ```
 
-To exercise the explicit synthetic demo:
+Both build commands accept `--skip-qa-map` and `--verbose`. `--force` rebuilds only that stage's cache.
+Changing bathymetry never requires rerunning the 2 m terrain stage.
+
+For the explicit synthetic demo:
 
 ```bash
 uv run python scripts/create_synthetic_fixtures.py
 uv run coastscan build-region --region synthetic_demo --force --write-samples
 ```
 
-`build-region` also accepts `--skip-qa-map` and `--verbose`. Missing mandatory inputs produce a
-concise non-zero error. `--force` rebuilds cached terrain; omit it for a checksum-validated cached
-rerun.
-
 ## Outputs
 
-- `data/interim/<region>/`: cleaned coastline, cached DEM/slope/roughness and optional long samples.
-- `data/processed/<region>/`: segments, transects, terrain features and joined segment features.
-- `outputs/manifests/<region>/`: timestamped JSON manifest and run log.
-- `outputs/qa/<region>/`: JSON QA summary and static overview/orientation/cross-section/distribution PNGs.
-- `outputs/reports/<region>/phase1_qa_report.html`: concise report and safety notice.
+- `data/interim/<region>/`: cached Phase 1 rasters and optional Phase 1/2 samples.
+- `data/processed/<region>/coast_segments.parquet`: stable upstream segment contract.
+- `data/processed/<region>/segment_features.parquet`: unchanged Phase 1 joined features.
+- `data/processed/<region>/bathymetry_transects.parquet`: separate long Phase 2 transects.
+- `data/processed/<region>/bathymetry_features.parquet`: regional bathymetry proxies.
+- `data/processed/<region>/segment_features_phase2.parquet`: descriptive Phase 1/2 join.
+- `outputs/manifests/<region>/`: separate timestamped Phase 1 and Phase 2 manifests.
+- `outputs/qa/<region>/`: machine-readable QA and static maps/cross-sections.
 
-Processed vectors remain in the metric analysis CRS. GeoParquet stores CRS metadata. Roughness is the
-centred, nodata-aware population standard deviation of elevation in the nearest odd-pixel window to
-`roughness_window_m`.
+Raw, interim, processed and run-output data are Git-ignored. The public repository stores acquisition
+plans, expected checksums, code, synthetic fixtures and documentation needed to reproduce official-data
+outputs without fabricating or redistributing Mallorca source data.
 
 ## Development and tests
 
 ```bash
+uv run ruff format --check .
 uv run ruff check .
 uv run pytest
 uv run mypy src
 ```
 
-Equivalent Make targets are `install`, `lint`, `test`, `inspect`, `build`, and `qa`; set `REGION` as
-needed. Tests programmatically cover rectangular/curved/narrow/multipart/lake geometries and linear,
-nodata, steep, and flat synthetic rasters.
+The synthetic suite covers coastline geometries and terrestrial rasters plus canonical bathymetry sign
+conversion, zero/nodata behavior, resolution classes, separate transects, known gradients/contours,
+provider methods, atomic download/reuse, Phase 2 manifests, cache reuse and stale-upstream rejection.
 
 ## Real-data limitations
 
-Orientation is local planar classification and correctly leaves geometrically unresolved cases
-ambiguous. The municipal mask and hydrographic coastline differ by tens of metres in places, so flags
-and endpoint QA require inspection. MDT02 water surfaces can contain low-reliability interpolated
-values, coastal pixels can be nodata, and horizontal mismatch can shift the local terrain origin;
-origin shifts are recorded and sea-level zero is never substituted. The bounded pilot is not a
-full-island validation. A later phase may add independently sourced bathymetry and its uncertainty
-model, but it must never reinterpret Phase 1 offshore transects or MDT02 as depth evidence.
+The municipal orientation mask and hydrographic coastline differ by tens of metres in places. MDT02
+coastal pixels can be nodata or interpolated. EMODnet 2024 is a harmonised regional grid and the pilot
+is predominantly supported by coarse GEBCO fallback cells; source quality fields are sparse, the
+interpolation flag does not distinguish interpolation from extrapolation and many transects have a
+coastline-to-first-valid-cell gap. QA retains these limitations, and the real screening class is capped
+at `background_only`. Neither stage supplies site-level safety evidence.

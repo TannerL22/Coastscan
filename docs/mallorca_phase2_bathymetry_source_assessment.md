@@ -65,4 +65,3 @@ EMODnet data products are licensed CC BY 4.0. Required acknowledgement:
 - Terms and attribution: <https://emodnet.ec.europa.eu/en/terms-use-emodnet-online-services-data-and-data-products>
 - SeaDataNet candidate metadata: <https://cdi.seadatanet.org/report/3305147>
 - IHM EMODnet participation: <https://armada.defensa.gob.es/ihm/Aplicaciones/EMODNET/emodnet.html>
-
