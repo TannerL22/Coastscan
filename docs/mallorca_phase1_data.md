@@ -94,6 +94,41 @@ roughness rasters. The second validates cache reuse. Analytical outputs are GeoP
 `data/processed/mallorca_northwest_pilot`; source audits are under `data/interim`; critical JSON,
 maps, HTML, logs, and manifests are under `outputs`.
 
+## Verified real-run results (2026-07-16)
+
+The final forced run selected 92 natural source records, cleaned 28.756 km into 92 parts, created
+174 segments, 2,788 transects, and 29,274 inland terrain samples. Cleaning shortened the selected
+29.103 km source geometry by 1.190%, which remains an explicit warning. The official feature
+fragmentation produced 23 connected components and 53 parts shorter than 75 m; these include genuine
+short shore pieces, islands, and AOI/source cuts and should not be read as 22 confirmed data gaps.
+The audit found 32 rejected or near-coincident candidate lines, including low-water/depth/river and
+engineered harbour classes.
+
+Orientation resolved 137 segments at the first distance and 34 through fallback multi-point voting.
+Three `COALNE` segments (1.72%) remain explicitly ambiguous: a narrow inlet, a 6.9 m islet fragment,
+and a complex enclosed bay. Twenty-two segments carry a source-mismatch flag. Of 1,394 endpoints in
+each direction, 104 inland endpoints fall outside the coarse municipal mask and 104 offshore
+endpoints fall on it; both checks pass but the clusters remain visible in `orientation_qa.png` and
+must not be suppressed. The coastline-to-mask boundary distance is 0 m at the median, 11.46 m at p90,
+and 48.33 m maximum.
+
+All generated samples for the 171 oriented segments are valid; no oriented segment is outside the
+DEM or partially covered. The three unresolved segments have no terrain result and retain
+`orientation_unresolved`. All 171 terrain origins are valid at the exact coastline pixel, with no
+zero substitution; origin elevation ranges from -0.015 m to 147.533 m and one origin is slightly
+negative. Two segments have near-zero 50 m relief. Slope stays within 0–88.24 degrees, but the highest
+slopes, relief values up to 243.93 m at the 100 m p90 statistic, and roughness p90 up to 45.30 m need
+source/field review. Three segments lie within 3 m of a source-tile edge; none shows reduced
+completeness or an out-of-range slope, and visual maps show no obvious seam artefact.
+
+The two selected COGs total 98,081,328 compressed bytes and 270,624,808 estimated uncompressed bytes.
+The clipped grid is 6,151 by 4,877 pixels (119,993,708 uncompressed bytes). The forced run took
+35.10 s, including 15.36 s for terrain preparation. The cached run took 20.34 s, with terrain
+preparation reduced to 0.44 s and `cache_used=true`. Coast segments, transects, terrain features,
+joined segment features, and the sorted segment-ID set retained identical SHA-256 values across the
+two runs. Peak process memory was not reported because it was not measurable reliably without a new
+profiling dependency; the bounded 512-pixel windows and clipped grid are the auditable memory evidence.
+
 ## Known mismatches and review boundaries
 
 The IHM line and municipal mask are independently generalized sources. Boundary distances can reach
