@@ -1,6 +1,5 @@
-"""Local interactive exploration support for verified CoastScan outputs."""
+"""Local interactive exploration support for verified CoastScan outputs.
 
-from coastscan.viewer.data import load_viewer_data
-from coastscan.viewer.metrics import available_metrics, metric_definition
-
-__all__ = ["available_metrics", "load_viewer_data", "metric_definition"]
+Submodules are intentionally not imported here so the analytical CLI and viewer launcher do not
+initialize Streamlit's cache runtime before the Streamlit process starts.
+"""
