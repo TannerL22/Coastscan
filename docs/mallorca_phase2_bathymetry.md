@@ -76,29 +76,29 @@ source type is fabricated.
 
 ## Verified real-run findings
 
-The initial forced and cached review runs produced 612 stable Phase 2 transects for 171 resolved or
-fallback-resolved segments; three ambiguous segments were excluded. Of those, 494 found valid
-bathymetry within 400 m and 118 did not. First-valid distance was 150 m at p50, 300 m at p90 and 400 m
-maximum. There were 129 large-gap transects across 72 segments. This is a material coastal-alignment
+The corrected forced and cached review runs produced 739 stable Phase 2 transects for 171 resolved or
+fallback-resolved segments; three ambiguous segments were excluded. Of those, 590 found valid
+bathymetry within 400 m and 149 did not. First-valid distance was 150 m at p50, 300 m at p90 and 400 m
+maximum. There were 147 large-gap transects across 85 segments. This is a material coastal-alignment
 limitation; the pipeline does not fill or extrapolate it back to the coast.
 
-All 174 segments have feature rows and 127 have at least one valid transect. Screening counts are 110
-`background_only` and 64 `insufficient`; none qualifies as local morphology. Mean valid shares at
-100/250/500/1,000 m were 0.118/0.483/0.552/0.539. Median segment depth proxies were 15.47, 15.81, 17.92
-and 23.42 m, but 100 m values exist for only 49 segments and are below native resolution.
+All 174 segments have feature rows and 151 have at least one valid transect. Screening counts are 129
+`background_only` and 45 `insufficient`; none qualifies as local morphology. Mean valid shares at
+100/250/500/1,000 m were 0.140/0.575/0.676/0.663. Median segment depth proxies were 14.19, 16.23, 17.99
+and 23.55 m, but 100 m values exist for only 59 segments and are below native resolution.
 
-For supported 250–1,000 m gradients, 100 segments have values: p10 -0.00155, p50 0.01479 and p90
-0.02528. Negative values are retained because seabed depth need not increase monotonically. Median
-approximate distances to 5/10/20/30 m depth were 230/287.5/690/1,150 m where reached. Eight segments
+For supported 250–1,000 m gradients, 120 segments have values: p10 0.00017, p50 0.01423 and p90
+0.02491. Negative values remain possible because seabed depth need not increase monotonically. Median
+approximate distances to 5/10/20/30 m depth were 230/265/690/1,150 m where reached. Nine segments
 met the configured broad-shallow-platform proxy.
 
-Across 5,815 valid samples, depth ranges from 0.0007 to 42.20 m (p1 0.51, p50 18.98, p99 35.65).
-About 80.4% of samples with an interpolation flag have value 1 and 18.0% have value 0; the source does
-not distinguish interpolation from extrapolation. `stdev` exists for only 618 rows. Reference indices
+Across 7,053 valid samples, depth ranges from 0.0007 to 42.20 m (p1 0.52, p50 19.23, p99 35.96).
+About 81.8% of samples with an interpolation flag have value 1 and 18.2% have value 0; the source does
+not distinguish interpolation from extrapolation. `stdev` exists for only 746 rows. Reference indices
 17267, 18564 and 22062 are retained in the audit. The subset lacks the official reference-string
 lookup, so the table records numeric IDs and `unknown` type instead of inventing a mapping.
 
-Manual review sets cover all 64 insufficient segments, all 72 segments with a large-gap transect, the
+Manual review sets cover all 45 insufficient segments, all 85 segments with a large-gap transect, the
 three orientation ambiguities, 22 Phase 1 source-mismatch segments, deterministic valid samples and
 steep/low-relief cross-layer categories. No high-resolution-source segments exist. The combined
 Phase 1/2 table is for descriptive plausibility QA only, never an opportunity score.
