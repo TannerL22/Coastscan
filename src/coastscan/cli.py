@@ -112,5 +112,33 @@ def build_bathymetry_command(
         raise typer.Exit(code=2) from None
 
 
+@app.command("view-map")
+def view_map_command(
+    region: str = typer.Option(..., "--region", help="Region ID with processed outputs"),
+    port: int = typer.Option(8501, "--port", min=1, max=65535),
+    host: str = typer.Option("localhost", "--host"),
+    no_browser: bool = typer.Option(False, "--no-browser", help="Do not open a browser window"),
+    verbose: bool = typer.Option(False, "--verbose"),
+) -> None:
+    """Launch the local Streamlit exploration viewer in the active environment."""
+    try:
+        from coastscan.viewer.launcher import launch_viewer
+
+        console.print(
+            f"[green]Launching CoastScan viewer[/green] for {region} at http://{host}:{port}"
+        )
+        launch_viewer(
+            region,
+            host=host,
+            port=port,
+            no_browser=no_browser,
+        )
+    except CoastScanError as exc:
+        console.print(f"[red]{exc}[/red]")
+        if verbose:
+            raise
+        raise typer.Exit(code=2) from None
+
+
 if __name__ == "__main__":
     app()
