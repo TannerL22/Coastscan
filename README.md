@@ -26,6 +26,11 @@ marine cell and calculates target-distance depths, regional gradients, contour-d
 source/quality summaries and transparent usability classes. It never overwrites Phase 1
 `segment_features.parquet`.
 
+Phase 2.5 adds a local Streamlit and PyDeck exploration viewer. It reads the existing GeoParquet
+tables, makes an in-memory EPSG:4326 display copy, and provides transparent terrain, regional
+bathymetry and data-quality controls. It does not calculate new analytical features or any combined
+score.
+
 The bathymetry hierarchy is: public authoritative high-resolution data where it genuinely overlaps;
 the latest stable EMODnet regional DTM as the mandatory baseline; lower-quality fallback cells retained
 with provenance; and a separate global grid only for a real uncovered gap. No public EMODnet HR-DTM
@@ -78,10 +83,23 @@ uv run coastscan build-region --region mallorca_northwest_pilot --force --write-
 uv run coastscan inspect-bathymetry --region mallorca_northwest_pilot
 uv run coastscan build-bathymetry --region mallorca_northwest_pilot --force --write-samples
 uv run coastscan build-bathymetry --region mallorca_northwest_pilot --write-samples
+
+# Local Phase 2.5 viewer
+uv run coastscan view-map --region mallorca_northwest_pilot
 ```
 
 Both build commands accept `--skip-qa-map` and `--verbose`. `--force` rebuilds only that stage's cache.
 Changing bathymetry never requires rerunning the 2 m terrain stage.
+
+The viewer opens at `http://localhost:8501` by default. It prefers
+`segment_features_phase2.parquet` and lazily loads `bathymetry_transects.parquet` only when the
+transect layer is enabled. If Phase 2 is absent, `segment_features.parquet` enables a clearly labelled
+terrain-only mode and bathymetry controls are disabled. Missing Phase 1 and Phase 2 outputs produce the
+exact acquisition/build commands needed to create them.
+
+The default CARTO Light/Dark basemaps require no account, API key or secret. A satellite option appears
+only when a local `MAPBOX_API_KEY` is supplied; `.env.example` documents the optional variable and
+secrets are Git-ignored. See `docs/local_viewer.md` for architecture, filters, testing and limitations.
 
 For the explicit synthetic demo:
 
@@ -117,6 +135,8 @@ uv run mypy src
 The synthetic suite covers coastline geometries and terrestrial rasters plus canonical bathymetry sign
 conversion, zero/nodata behavior, resolution classes, separate transects, known gradients/contours,
 provider methods, atomic download/reuse, Phase 2 manifests, cache reuse and stale-upstream rejection.
+Viewer tests cover immutable loading/reprojection, metric metadata, filters, colour scales, PyDeck
+layers, deterministic interpretation, terrain-only operation, missing files and Streamlit smoke tests.
 
 ## Real-data limitations
 
@@ -126,3 +146,6 @@ is predominantly supported by coarse GEBCO fallback cells; source quality fields
 interpolation flag does not distinguish interpolation from extrapolation and many transects have a
 coastline-to-first-valid-cell gap. QA retains these limitations, and the real screening class is capped
 at `background_only`. Neither stage supplies site-level safety evidence.
+
+The viewer exposes individual measurements and regional proxies for sorting and filtering. It does not
+rank the "best" coastline, make trip suggestions, or provide an exploration, jumping or safety score.
