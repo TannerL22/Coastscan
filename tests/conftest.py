@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 import rasterio
 from rasterio.transform import from_origin
+from shapely import contains_xy
 from shapely.geometry import MultiPolygon, Polygon, box
 
 
@@ -120,3 +121,69 @@ quality:
         encoding="utf-8",
     )
     return tmp_path
+
+
+@pytest.fixture
+def synthetic_bathymetry_project(synthetic_project: Path) -> Path:
+    """Phase 1 project extended with a distinct positive-down offshore raster."""
+    path = synthetic_project / "data" / "fixtures" / "bathymetry.tif"
+    pixel = 50.0
+    transform = from_origin(-600, 1100, pixel, pixel)
+    rows, columns = 34, 44
+    x = -600 + (np.arange(columns) + 0.5) * pixel
+    y = 1100 - (np.arange(rows) + 0.5) * pixel
+    xx, yy = np.meshgrid(x, y)
+    land = box(0, 0, 1000, 500)
+    inside = contains_xy(land, xx, yy)
+    dx = np.maximum.reduce([-xx, xx - 1000, np.zeros_like(xx)])
+    dy = np.maximum.reduce([-yy, yy - 500, np.zeros_like(yy)])
+    distance = np.hypot(dx, dy)
+    depth = (5 + 0.05 * distance).astype("float32")
+    depth[inside] = -9999
+    with rasterio.open(
+        path,
+        "w",
+        driver="GTiff",
+        height=rows,
+        width=columns,
+        count=1,
+        dtype="float32",
+        crs="EPSG:3857",
+        transform=transform,
+        nodata=-9999.0,
+    ) as dataset:
+        dataset.write(depth, 1)
+    config_path = synthetic_project / "config" / "regions" / "demo.yml"
+    text = config_path.read_text(encoding="utf-8")
+    text = text.replace(
+        "  elevation: {path: data/fixtures/dem.tif, source_id: dem_fixture}\n",
+        "  elevation: {path: data/fixtures/dem.tif, source_id: dem_fixture}\n"
+        "  bathymetry:\n"
+        "    source_id: synthetic_bathymetry\n"
+        "    path: data/fixtures/bathymetry.tif\n"
+        "    source_adapter: generic\n"
+        "    source_release: '1'\n"
+        "    vertical_datum: SYNTHETIC_DATUM\n"
+        "    depth_sign_convention: positive_down\n"
+        "    native_resolution_m: 50\n"
+        "    screening_class_ceiling: coastal_context\n"
+        "    higher_resolution_assessment: Synthetic fixture; not applicable.\n"
+        "    variables: {mean_depth: band_1}\n",
+    )
+    text += """bathymetry:
+  target_distances_m: [100, 250, 500]
+  maximum_offshore_distance_m: 500
+  transect_spacing_m: 100
+  continuous_sample_spacing_m: 25
+  first_valid_search_max_distance_m: 200
+  contour_depths_m: [5, 10, 20]
+  minimum_valid_transect_share: 0.5
+  minimum_resolution_ratio: 1
+  large_coastal_gap_threshold_m: 100
+  shallow_platform_distance_m: 500
+  shallow_platform_depth_m: 20
+  shallow_platform_minimum_share: 0.6
+  write_samples: true
+"""
+    config_path.write_text(text, encoding="utf-8")
+    return synthetic_project
