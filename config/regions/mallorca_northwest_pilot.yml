@@ -16,6 +16,8 @@ inputs:
         accepted_values: [true]
       - field: PLEAMAR
         accepted_values: [true]
+      - field: CATEGORIA
+        accepted_values: [COALNE, COSTA_ESCARPADA, ORILLA_ARENA]
   land_polygon:
     path: data/raw/boundaries/LINEAS_LIMITE/SHP_ETRS89/recintos_municipales_inspire_peninbal_etrs89/recintos_municipales_inspire_peninbal_etrs89.shp
     source_id: cnig_administrative_boundaries

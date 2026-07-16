@@ -53,9 +53,10 @@ blockwise slope/roughness derivatives. All selected source checksums participate
 
 ## Mallorca northwest real pilot
 
-`mallorca_northwest_pilot` covers approximately 31.56 km of official high-water coastline from the
+`mallorca_northwest_pilot` covers approximately 29.10 km of official natural high-water coastline from the
 Port de Sóller area through Cala Tuent to Sa Calobra. It uses the IHM/CNIG `Línea de costa` COSTA
-layer (`CIERRACOST=true`, `PLEAMAR=true`), the CNIG municipal dataset as orientation support, and two
+layer (`CIERRACOST=true`, `PLEAMAR=true`) limited to the natural `COALNE`, `COSTA_ESCARPADA`, and
+`ORILLA_ARENA` classes, the CNIG municipal dataset as orientation support, and two
 intersecting CNIG MDT02 second-coverage 2 m COG tiles. Raw downloads and generated rasters are ignored
 by Git; source metadata and checksums are retained in the acquisition manifest.
 

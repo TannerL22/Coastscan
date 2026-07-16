@@ -5,7 +5,7 @@
 The bounded `mallorca_northwest_pilot` covers EPSG:4326 bounds
 `[2.66, 39.77, 2.80, 39.86]`, from the Port de Sóller area through Cala Tuent to Sa Calobra.
 The bounds use named geographic endpoints and documented margins; they are not a box selected after
-seeing pipeline results. The official selected high-water geometry is approximately 31.56 km long.
+seeing pipeline results. The official selected natural high-water geometry is approximately 29.10 km long.
 It contains multiple bays and headlands, exposed Serra de Tramuntana slopes, locally gentler harbour
 terrain, source-geometry mismatch, coastal DEM nodata, and a DEM tile boundary while remaining
 practical at 2 m resolution. The generated AOI is
@@ -24,9 +24,12 @@ practical at 2 m resolution. The generated AOI is
 - Archive SHA-256: `7393e14ca120596d607e68fc0be69e734414a658c447b2f304dd7d5c2ffb11a6`.
 - Source fields inspected: `FEATURE`, `LOCALID`, `CATEGORIA`, `ESCALA`, `BAJAMAR`, `PLEAMAR`,
   `CIERRACOST`, `CUBREDESCU`, and `DATE`.
-- Analytical selection: `CIERRACOST=true AND PLEAMAR=true`. The official product documentation says
-  those fields build the high-water closure line; `CIERRACOST=true AND BAJAMAR=true` denotes the
-  low-water line. Rejected classes and near-coincident representations remain in
+- Analytical selection: `CIERRACOST=true AND PLEAMAR=true` and `CATEGORIA` in `COALNE`,
+  `COSTA_ESCARPADA`, or `ORILLA_ARENA`. The official product documentation says the first two fields
+  build the high-water closure line; `CIERRACOST=true AND BAJAMAR=true` denotes the low-water line.
+  Visual QA of the first real run confirmed that `MUELLE`, `ROMPEOLAS`, `SLCONS`, and `VARADERO`
+  represent engineered harbour/constructed features in this pilot, not the target terrestrial rocky
+  coastline. Rejected classes and near-coincident representations remain in
   `coastline_source_audit.parquet`; they are not double-counted.
 - Required attribution: `Obra derivada de LC 2023 CC-BY 4.0 armada.mde.es/ihm/`.
 
