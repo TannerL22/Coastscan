@@ -23,6 +23,20 @@ def calculate_terrain_features(
     steep_threshold_deg: float,
     minimum_valid_sample_share: float,
 ) -> pd.DataFrame:
+    samples = samples.copy()
+    if "terrain_origin_elevation_m" not in samples.columns:
+        origins = (
+            samples.loc[samples.sample_distance_m.abs() <= sample_spacing_m / 2]
+            .drop_duplicates("transect_id")
+            .set_index("transect_id")["elevation_m"]
+        )
+        samples["terrain_origin_elevation_m"] = samples.transect_id.map(origins)
+        samples["terrain_origin_shift_m"] = np.where(
+            samples.terrain_origin_elevation_m.notna(), 0.0, np.nan
+        )
+        samples["terrain_origin_method"] = np.where(
+            samples.terrain_origin_elevation_m.notna(), "exact", "unavailable"
+        )
     records: list[dict[str, object]] = []
     tolerance = sample_spacing_m / 2 + 1e-6
     inland = transects.loc[transects.direction == "inland"]
@@ -36,8 +50,26 @@ def calculate_terrain_features(
         )
         valid_count = int(valid_elevation.sum())
         valid_share = valid_count / total_samples if total_samples else 0.0
-        coast = segment_samples.loc[segment_samples.sample_distance_m <= tolerance, "elevation_m"]
-        record["elevation_coast_p50_m"] = _percentile(coast, 50)
+        origins = (
+            segment_samples.drop_duplicates("transect_id") if total_samples else segment_samples
+        )
+        origin_elevations = (
+            origins.terrain_origin_elevation_m if total_samples else pd.Series(dtype=float)
+        )
+        origin_shifts = origins.terrain_origin_shift_m if total_samples else pd.Series(dtype=float)
+        origin_methods = origins.terrain_origin_method if total_samples else pd.Series(dtype=str)
+        record["elevation_coast_p50_m"] = _percentile(origin_elevations, 50)
+        record["terrain_origin_elevation_m"] = _percentile(origin_elevations, 50)
+        record["terrain_origin_shift_m"] = _percentile(origin_shifts, 50)
+        if not total_samples or (origin_methods == "unavailable").all():
+            record["terrain_origin_method"] = "unavailable"
+            record["terrain_origin_quality_flag"] = "no_valid_inland_origin"
+        elif (origin_methods == "exact").all():
+            record["terrain_origin_method"] = "exact"
+            record["terrain_origin_quality_flag"] = "good"
+        else:
+            record["terrain_origin_method"] = "shifted_inland"
+            record["terrain_origin_quality_flag"] = "shifted"
         for distance in relief_distances_m:
             label = f"{distance:g}m"
             elevation_values = _distance_values(segment_samples, distance, tolerance)
@@ -47,10 +79,10 @@ def calculate_terrain_features(
                 transect_samples = segment_samples.loc[
                     segment_samples.transect_id == transect.transect_id
                 ]
-                origin = _distance_values(transect_samples, 0, tolerance)
+                origin = transect_samples.terrain_origin_elevation_m.dropna()
                 at_distance = _distance_values(transect_samples, distance, tolerance)
                 if origin.notna().any() and at_distance.notna().any():
-                    reliefs.append(float(at_distance.dropna().iloc[0] - origin.dropna().iloc[0]))
+                    reliefs.append(float(at_distance.dropna().iloc[0] - origin.iloc[0]))
             record[f"land_relief_{label}_p50_m"] = _percentile(reliefs, 50)
             record[f"land_relief_{label}_p90_m"] = _percentile(reliefs, 90)
         valid_slopes = segment_samples.slope_deg.dropna()

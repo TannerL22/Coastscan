@@ -50,9 +50,14 @@ def generate_qa_artifacts(
     plt.close(figure)
     outputs.append(path)
 
-    selected = segments.sample(min(sample_size, len(segments)), random_state=0).sort_values(
-        "segment_id"
+    random_sample = segments.sample(min(sample_size, len(segments)), random_state=0)
+    flagged = segments.loc[
+        (segments.orientation_status == "ambiguous") | segments.orientation_source_mismatch_flag
+    ]
+    selected = (
+        pd.concat([random_sample, flagged]).drop_duplicates("segment_id").sort_values("segment_id")
     )
+    selected = gpd.GeoDataFrame(selected, geometry="geometry", crs=segments.crs)
     figure, axis = plt.subplots(figsize=(9, 7))
     gpd.GeoSeries([land], crs=segments.crs).plot(ax=axis, alpha=0.2)
     for status, group in selected.groupby("orientation_status"):
@@ -67,13 +72,35 @@ def generate_qa_artifacts(
     gpd.GeoSeries(selected.sea_test_point, crs=segments.crs).plot(
         ax=axis, markersize=8, label="sea test point"
     )
-    axis.set_title("Orientation QA sample: test points and transects")
+    axis.set_title("Orientation QA: deterministic sample plus every ambiguous/mismatch segment")
     axis.set_aspect("equal")
     axis.legend(fontsize=7)
     path = output_dir / "orientation_qa.png"
     figure.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(figure)
     outputs.append(path)
+
+    analytical = gpd.GeoDataFrame(
+        segments[["segment_id", "geometry"]].merge(features, on="segment_id", how="left"),
+        geometry="geometry",
+        crs=segments.crs,
+    )
+    feature_maps = {
+        "land_relief_50m_p50_m": "relief_50m_map.png",
+        "slope_p90_deg": "slope_p90_map.png",
+        "steep_nearshore_transect_share": "steep_nearshore_map.png",
+        "terrain_valid_sample_share": "terrain_completeness_map.png",
+    }
+    for field, filename in feature_maps.items():
+        figure, axis = plt.subplots(figsize=(9, 7))
+        gpd.GeoSeries([land], crs=segments.crs).boundary.plot(ax=axis, linewidth=0.4)
+        analytical.plot(ax=axis, column=field, legend=True, linewidth=2)
+        axis.set_title(field)
+        axis.set_aspect("equal")
+        path = output_dir / filename
+        figure.savefig(path, dpi=150, bbox_inches="tight")
+        plt.close(figure)
+        outputs.append(path)
 
     figure, axes = plt.subplots(1, 2, figsize=(12, 4))
     candidates = samples[["segment_id", "transect_id"]].drop_duplicates()

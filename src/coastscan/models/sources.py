@@ -18,4 +18,5 @@ class SourceRecord(BaseModel):
     download_date: str = ""
     local_path: str = ""
     checksum: str = ""
+    required_attribution: str = ""
     notes: str = ""

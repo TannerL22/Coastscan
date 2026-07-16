@@ -1,0 +1,13 @@
+{
+  "aoi_id": "mallorca_northwest_pilot",
+  "method": "Bounding polygon around the named coastal section from Port de Soller through Cala Tuent to Sa Calobra, with documented inland and seaward margins",
+  "named_endpoints": [
+    {"name": "Port de Soller harbour entrance", "longitude": 2.68, "latitude": 39.79},
+    {"name": "Sa Calobra coastal inlet", "longitude": 2.8, "latitude": 39.85}
+  ],
+  "bounds_epsg4326": [2.66, 39.77, 2.8, 39.86],
+  "approximate_official_high_water_coastline_km": 31.56,
+  "rationale": "A meaningful contiguous Serra de Tramuntana section containing Port de Soller, multiple exposed headlands, Cala Tuent and Sa Calobra; it includes steep and locally gentler terrain while requiring only the two MDT02 tiles that intersect the buffered processing corridor.",
+  "source_geometry": "IHM Linea de costa 2022 COSTA layer, CIERRACOST=true and PLEAMAR=true",
+  "exclusions": "Coastline outside the bounds, including the remainder of Mallorca and all other Balearic islands"
+}

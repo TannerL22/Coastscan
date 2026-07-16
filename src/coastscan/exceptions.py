@@ -27,3 +27,7 @@ class OrientationError(CoastScanError):
 
 class QualityThresholdError(CoastScanError):
     """A configured blocking quality threshold was exceeded."""
+
+
+class AcquisitionError(CoastScanError):
+    """Authoritative source discovery, download, or validation failed."""

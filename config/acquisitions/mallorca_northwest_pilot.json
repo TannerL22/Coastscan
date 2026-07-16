@@ -1,0 +1,67 @@
+{
+  "region_id": "mallorca_northwest_pilot",
+  "download_status": "pending",
+  "manual_action_required": false,
+  "notes": [
+    "Resource identifiers were discovered through the public CNIG product catalogue for the documented AOI."
+  ],
+  "sources": [
+    {
+      "source_id": "ihm_spain_coastline",
+      "provider": "Instituto Hidrografico de la Marina, distributed by CNIG",
+      "product_name": "Linea de costa",
+      "product_version": "LC2022 (catalogue attribution label LC 2023)",
+      "edition_date": "2022-06",
+      "official_product_reference": "https://centrodedescargas.cnig.es/CentroDescargas/detalleArchivo?sec=9000006",
+      "licence": "Free use with mandatory IHM attribution; CNIG provides CC-BY 4.0 recognition formulas",
+      "required_attribution": "Obra derivada de LC 2023 CC-BY 4.0 armada.mde.es/ihm/",
+      "remote_metadata": {"catalogue_date": "2022-10-14", "format": "Shapefile", "native_crs": "EPSG:4326", "catalogue_size_mb": 34.52},
+      "resources": [
+        {
+          "resource_name": "LC.zip",
+          "cnig_sequential_id": "9000006",
+          "local_relative_path": "data/raw/coastline/LC.zip",
+          "expected_checksum": "7393e14ca120596d607e68fc0be69e734414a658c447b2f304dd7d5c2ffb11a6",
+          "archive": true,
+          "extract_to": "data/raw/coastline/LC"
+        }
+      ]
+    },
+    {
+      "source_id": "cnig_administrative_boundaries",
+      "provider": "Instituto Geografico Nacional / CNIG",
+      "product_name": "Limites municipales, provinciales y autonomicos",
+      "product_version": "BDLJE 2026-02",
+      "edition_date": "2026-02-12",
+      "official_product_reference": "https://centrodedescargas.cnig.es/CentroDescargas/detalleArchivo?sec=9000029",
+      "licence": "Compatible with CC-BY 4.0 under Orden FOM/2807/2015",
+      "required_attribution": "Obra derivada de BDLJE CC-BY 4.0 ign.es",
+      "remote_metadata": {"scale": "1:25000", "format": "Shapefile", "native_crs": "EPSG:4258", "catalogue_size_mb": 137.29},
+      "resources": [
+        {
+          "resource_name": "LINEAS_LIMITE.zip",
+          "cnig_sequential_id": "9000029",
+          "local_relative_path": "data/raw/boundaries/LINEAS_LIMITE.zip",
+          "expected_checksum": "d2c5ee140e7f48b3a5fc177b7c2bb05b757472e349290d0d0065d9c562f891da",
+          "archive": true,
+          "extract_to": "data/raw/boundaries/LINEAS_LIMITE"
+        }
+      ]
+    },
+    {
+      "source_id": "cnig_mdt02_cob2",
+      "provider": "Instituto Geografico Nacional / CNIG",
+      "product_name": "MDT02 - 2a cobertura",
+      "product_version": "PNOA-LiDAR second coverage 2015-2021",
+      "edition_date": "2019 Mallorca tiles",
+      "official_product_reference": "https://centrodedescargas.cnig.es/CentroDescargas/modelo-digital-terreno-mdt02-segunda-cobertura",
+      "licence": "Compatible with CC-BY 4.0 under Orden FOM/2807/2015",
+      "required_attribution": "Obra derivada de MDT02-cob2 2015-2021 CC-BY 4.0 ign.es",
+      "remote_metadata": {"format": "COG", "native_crs": "EPSG:25831", "horizontal_resolution_m": 2, "vertical_units": "orthometric metres", "water_surface_reliability": "low; interpolated constant elevations may occur"},
+      "resources": [
+        {"resource_name": "MDT02-ETRS89-HU31-0643-4-COB2.TIF", "cnig_sequential_id": "11411721", "local_relative_path": "data/raw/elevation/mdt02/MDT02-ETRS89-HU31-0643-4-COB2.TIF", "expected_checksum": "c81d1f23cd6094d63810852552d109ec22f34593fa491aa643a8384a6cc56e2e"},
+        {"resource_name": "MDT02-ETRS89-HU31-0670-2-COB2.TIF", "cnig_sequential_id": "11411732", "local_relative_path": "data/raw/elevation/mdt02/MDT02-ETRS89-HU31-0670-2-COB2.TIF", "expected_checksum": "736ae763777cd3a1162632bf4076619d15b193e9b47e2f69f9b59f7676119db3"}
+      ]
+    }
+  ]
+}

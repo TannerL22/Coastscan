@@ -6,11 +6,12 @@ from pathlib import Path
 from typing import Any
 
 SAFETY_NOTICE = (
-    "CoastScan identifies areas for further desktop and field investigation. Terrain data does not "
-    "resolve underwater hazards; offshore transects are analytical geometry only. No output is a "
-    "recommendation that a location is safe. Exact locations require legal, environmental and "
-    "physical site assessment. Tides, waves, erosion, rockfall and sediment movement can change "
-    "conditions."
+    "This run evaluates terrestrial coastal morphology only. Offshore transects contain no "
+    "measured depth information, and the DEM must not be interpreted as underwater terrain. A "
+    "steep terrestrial segment is not evidence of a safe jump. Exact coastal conditions can differ "
+    "from source geometry, "
+    "and no output removes the need for legal, environmental and physical site assessment. Tides, "
+    "waves, erosion, rockfall and sediment movement can change conditions."
 )
 
 
@@ -50,6 +51,8 @@ def write_qa_report(
 <p>Mean terrain valid-sample share: {terrain_valid_share:.4f}</p>
 <h2>QA</h2><p>Overall pass: {qa_summary.get("passed")}</p>
 <p>Failed checks: {html.escape(", ".join(failed) or "None")}</p>
+<h2>Critical source and terrain findings</h2>
+<pre>{html.escape(json.dumps(qa_summary, indent=2, sort_keys=True, default=str))}</pre>
 <h2>Artefacts</h2><ul>{items(artifacts)}</ul></body></html>"""
     path.write_text(document, encoding="utf-8")
     return path

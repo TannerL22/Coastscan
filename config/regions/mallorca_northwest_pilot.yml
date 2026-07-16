@@ -1,0 +1,113 @@
+region_id: mallorca_northwest_pilot
+region_name: Mallorca Northwest Real Pilot
+country: Spain
+analysis_crs: EPSG:25831
+output_crs: EPSG:4326
+inputs:
+  coastline:
+    mode: direct
+    path: data/raw/coastline/LC/COSTA/COSTA.shp
+    source_id: ihm_spain_coastline
+    source_id_field: LOCALID
+    source_class_field: CATEGORIA
+    duplicate_tolerance_m: 10
+    feature_filters:
+      - field: CIERRACOST
+        accepted_values: [true]
+      - field: PLEAMAR
+        accepted_values: [true]
+  land_polygon:
+    path: data/raw/boundaries/LINEAS_LIMITE/SHP_ETRS89/recintos_municipales_inspire_peninbal_etrs89/recintos_municipales_inspire_peninbal_etrs89.shp
+    source_id: cnig_administrative_boundaries
+    role: orientation_mask
+    selection_filters:
+      - field: NATCODE
+        accepted_values:
+          - "34040707001"
+          - "34040707003"
+          - "34040707004"
+          - "34040707005"
+          - "34040707006"
+          - "34040707007"
+          - "34040707008"
+          - "34040707009"
+          - "34040707010"
+          - "34040707011"
+          - "34040707012"
+          - "34040707013"
+          - "34040707014"
+          - "34040707016"
+          - "34040707017"
+          - "34040707018"
+          - "34040707019"
+          - "34040707020"
+          - "34040707021"
+          - "34040707022"
+          - "34040707025"
+          - "34040707027"
+          - "34040707028"
+          - "34040707029"
+          - "34040707030"
+          - "34040707031"
+          - "34040707033"
+          - "34040707034"
+          - "34040707035"
+          - "34040707036"
+          - "34040707038"
+          - "34040707039"
+          - "34040707040"
+          - "34040707041"
+          - "34040707042"
+          - "34040707043"
+          - "34040707044"
+          - "34040707045"
+          - "34040707047"
+          - "34040707049"
+          - "34040707051"
+          - "34040707053"
+          - "34040707055"
+          - "34040707056"
+          - "34040707057"
+          - "34040707058"
+          - "34040707059"
+          - "34040707060"
+          - "34040707061"
+          - "34040707062"
+          - "34040707063"
+          - "34040707065"
+          - "34040707901"
+  elevation:
+    source_id: cnig_mdt02_cob2
+    paths:
+      - data/raw/elevation/mdt02/MDT02-ETRS89-HU31-0643-4-COB2.TIF
+      - data/raw/elevation/mdt02/MDT02-ETRS89-HU31-0670-2-COB2.TIF
+    mosaic_mode: vrt
+    vertical_units: metres
+area_of_interest:
+  path: data/raw/boundaries/mallorca_northwest_aoi.gpkg
+  layer: aoi
+coastline:
+  target_segment_length_m: 250
+  minimum_segment_length_m: 75
+  simplification_tolerance_m: 2
+  orientation_test_distance_m: 20
+  orientation_fallback_distances_m: [40, 80, 150]
+  orientation_vote_offsets_m: [-25, 0, 25]
+  source_mismatch_tolerance_m: 10
+  include_interior_shorelines: false
+transects:
+  spacing_m: 25
+  inland_length_m: 100
+  offshore_length_m: 200
+terrain:
+  relief_distances_m: [25, 50, 100]
+  sample_spacing_m: 5
+  steep_slope_threshold_degrees: 35
+  roughness_window_m: 15
+  minimum_valid_sample_share: 0.7
+  origin_search_max_distance_m: 20
+  write_samples: true
+quality:
+  maximum_ambiguous_orientation_share: 0.02
+  maximum_missing_terrain_share: 0.05
+  random_qa_sample_size: 50

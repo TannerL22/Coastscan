@@ -24,6 +24,7 @@ def sample_terrain(
     slope_path: Path,
     roughness_path: Path,
     sample_spacing_m: float,
+    origin_search_max_distance_m: float = 0.0,
 ) -> pd.DataFrame:
     inland = transects.loc[transects.direction == "inland"].copy()
     rows: list[dict[str, object]] = []
@@ -45,6 +46,20 @@ def sample_terrain(
             roughnesses = [
                 _value(value, roughness.nodata) for value in roughness.sample(coords, masked=False)
             ]
+            origin_candidates = [
+                (float(distance), elevation)
+                for distance, elevation in zip(distances, elevations, strict=True)
+                if distance <= origin_search_max_distance_m + 1e-7 and np.isfinite(elevation)
+            ]
+            if origin_candidates:
+                origin_shift, origin_elevation = origin_candidates[0]
+                origin_method = "exact" if np.isclose(origin_shift, 0) else "shifted_inland"
+                origin_quality = "good" if origin_method == "exact" else "shifted"
+            else:
+                origin_shift = float("nan")
+                origin_elevation = float("nan")
+                origin_method = "unavailable"
+                origin_quality = "no_valid_inland_origin"
             for distance, elevation, slope_value, roughness_value in zip(
                 distances, elevations, slopes, roughnesses, strict=True
             ):
@@ -58,6 +73,10 @@ def sample_terrain(
                         "roughness": roughness_value,
                         "valid_elevation": bool(np.isfinite(elevation)),
                         "valid_slope": bool(np.isfinite(slope_value)),
+                        "terrain_origin_method": origin_method,
+                        "terrain_origin_shift_m": origin_shift,
+                        "terrain_origin_elevation_m": origin_elevation,
+                        "terrain_origin_quality_flag": origin_quality,
                     }
                 )
     columns = [
@@ -69,5 +88,9 @@ def sample_terrain(
         "roughness",
         "valid_elevation",
         "valid_slope",
+        "terrain_origin_method",
+        "terrain_origin_shift_m",
+        "terrain_origin_elevation_m",
+        "terrain_origin_quality_flag",
     ]
     return pd.DataFrame(rows, columns=columns)

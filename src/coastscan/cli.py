@@ -5,11 +5,28 @@ import json
 import typer
 from rich.console import Console
 
+from coastscan.acquire import acquire_region_data
 from coastscan.exceptions import CoastScanError
 from coastscan.pipeline.build_region import build_region, inspect_region_inputs
 
 app = typer.Typer(no_args_is_help=True, help="CoastScan Phase 1 geospatial pipeline")
 console = Console()
+
+
+@app.command("acquire-region-data")
+def acquire_region_data_command(
+    region: str = typer.Option(..., "--region", help="Region ID with an acquisition plan"),
+    verbose: bool = typer.Option(False, "--verbose"),
+) -> None:
+    """Download and validate only the authoritative files planned for a region."""
+    try:
+        manifest = acquire_region_data(region)
+        console.print_json(json.dumps(manifest.model_dump(mode="json")))
+    except CoastScanError as exc:
+        console.print(f"[red]{exc}[/red]")
+        if verbose:
+            raise
+        raise typer.Exit(code=2) from None
 
 
 @app.command("inspect-inputs")

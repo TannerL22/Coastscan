@@ -1,7 +1,7 @@
 # CoastScan
 
-CoastScan Phase 1 is a reproducible GIS pipeline that turns a configured regional land polygon
-and local elevation raster into cleaned coastline parts, stable approximately 250 m segments,
+CoastScan Phase 1/1.5 is a reproducible GIS pipeline that turns configured coastline, land-mask,
+and elevation sources into cleaned coastline parts, stable approximately 250 m segments,
 landward/offshore transects, terrestrial morphology features, run manifests, and QA artefacts.
 
 ## Safety and uncertainty
@@ -14,11 +14,12 @@ with tides, waves, erosion, rockfall, and sediment movement.
 
 ## Phase 1 scope
 
-Implemented: configuration validation, polygon input and minimal validity repair, exterior/interior
-shoreline classification, conservative cleaning, stable segmentation, local tangent and orientation,
-transects, DEM validation/reprojection/cache, nodata-aware slope and local elevation-standard-deviation
-roughness, inland sampling, segment features, provenance manifests, QA checks/maps/report, and synthetic
-fixtures. Phase 1 does not include bathymetry, water clarity, satellite imagery, geology, waves,
+Implemented: configuration validation, polygon-derived and direct-line coastline modes, a separate
+land-orientation mask, conservative cleaning, stable segmentation, multi-point orientation voting,
+transects, windowed multi-tile DEM validation/reprojection/cache, nodata-aware slope and roughness,
+nearest-valid-inland terrain origins, segment features, provenance manifests, QA checks/maps/report,
+official-data acquisition metadata, and synthetic fixtures. Phase 1 does not include bathymetry,
+water clarity, satellite imagery, geology, waves,
 protected areas, access or exploration scoring, machine learning, or a public frontend.
 
 ## Install
@@ -30,25 +31,45 @@ uv sync
 uv run coastscan --help
 ```
 
-PowerShell uses the same commands:
+PowerShell uses the same commands. The verification environment is Python 3.12:
 
 ```powershell
-uv sync
-uv run coastscan inspect-inputs --region mallorca_pilot
+uv sync --python 3.12
+uv run coastscan inspect-inputs --region synthetic_demo
 ```
 
-## Inputs and configuration
+## Coastline and terrain source architecture
 
-Region YAML lives under `config/regions/`. The Mallorca configuration expects:
+Region YAML lives under `config/regions/`. Existing regions can derive the coastline from a land
+polygon. The preferred production mode loads an authoritative line/multiline coastline directly;
+that geometry controls cleaning, IDs, bearings, origins, and length. A separate polygon is used only
+for land/sea orientation, QA, and coarse clipping. The administrative boundary never replaces an
+available direct coastline.
 
-- `data/raw/boundaries/mallorca_land.gpkg`, layer `land`: valid/repairable Polygon or MultiPolygon,
-  with a known CRS. GeoJSON, Shapefile and GeoParquet are also supported when the config path/layer
-  are updated.
-- `data/raw/elevation/mallorca_dem.tif`: GDAL-readable elevation raster, known CRS, valid affine
-  transform, metre vertical units, explicit nodata where applicable, and overlap with Mallorca.
+Elevation can be one raster, explicit paths, a directory, or a glob. Tile headers are checked for
+CRS, resolution, nodata, transform, and vertical-unit consistency. Only processing-corridor tiles and
+windows are read; the deterministic first-valid overlap rule feeds a clipped cached raster and
+blockwise slope/roughness derivatives. All selected source checksums participate in the cache key.
 
-No real Mallorca source data is included or fabricated. Complete `data_catalog/sources.csv` from the
-authoritative provider metadata and record checksums before production use.
+## Mallorca northwest real pilot
+
+`mallorca_northwest_pilot` covers approximately 31.56 km of official high-water coastline from the
+Port de Sóller area through Cala Tuent to Sa Calobra. It uses the IHM/CNIG `Línea de costa` COSTA
+layer (`CIERRACOST=true`, `PLEAMAR=true`), the CNIG municipal dataset as orientation support, and two
+intersecting CNIG MDT02 second-coverage 2 m COG tiles. Raw downloads and generated rasters are ignored
+by Git; source metadata and checksums are retained in the acquisition manifest.
+
+Acquire or validate the required official files with:
+
+```bash
+uv run coastscan acquire-region-data --region mallorca_northwest_pilot
+```
+
+The downloader uses the public CNIG catalogue workflow, validates checksums/archive integrity, uses
+safe partial files, and reuses matching downloads. If CNIG requires manual interaction, use the exact
+product references and filenames in `config/acquisitions/mallorca_northwest_pilot.json`, place them at
+the listed local paths, and rerun the command. It will validate rather than fabricate or substitute
+data. Full source details and attribution are in `docs/mallorca_phase1_data.md`.
 
 ## Commands
 
@@ -56,6 +77,9 @@ authoritative provider metadata and record checksums before production use.
 uv run coastscan inspect-inputs --region mallorca_pilot
 uv run coastscan build-region --region mallorca_pilot --write-samples
 uv run python scripts/build_region.py --region mallorca_pilot
+
+uv run coastscan inspect-inputs --region mallorca_northwest_pilot
+uv run coastscan build-region --region mallorca_northwest_pilot --force --write-samples
 ```
 
 To exercise the explicit synthetic demo:
@@ -66,8 +90,8 @@ uv run coastscan build-region --region synthetic_demo --force --write-samples
 ```
 
 `build-region` also accepts `--skip-qa-map` and `--verbose`. Missing mandatory inputs produce a
-concise non-zero error. `--force` rebuilds cached terrain; otherwise a source/config/region cache key
-prevents redundant reprojection.
+concise non-zero error. `--force` rebuilds cached terrain; omit it for a checksum-validated cached
+rerun.
 
 ## Outputs
 
@@ -93,10 +117,12 @@ Equivalent Make targets are `install`, `lint`, `test`, `inspect`, `build`, and `
 needed. Tests programmatically cover rectangular/curved/narrow/multipart/lake geometries and linear,
 nodata, steep, and flat synthetic rasters.
 
-## Known limitations and next work
+## Real-data limitations
 
 Orientation is local planar classification and correctly leaves geometrically unresolved cases
-ambiguous. DEM vertical units are declared by configuration/catalogue rather than inferred from GeoTIFF
-metadata. Terrain preparation currently reprojects and clips in memory, appropriate for the stated pilot
-scale but not continental rasters. The next phase should add independently sourced bathymetry and its
-uncertainty model; it must not reinterpret Phase 1 offshore transects as depth evidence.
+ambiguous. The municipal mask and hydrographic coastline differ by tens of metres in places, so flags
+and endpoint QA require inspection. MDT02 water surfaces can contain low-reliability interpolated
+values, coastal pixels can be nodata, and horizontal mismatch can shift the local terrain origin;
+origin shifts are recorded and sea-level zero is never substituted. The bounded pilot is not a
+full-island validation. A later phase may add independently sourced bathymetry and its uncertainty
+model, but it must never reinterpret Phase 1 offshore transects or MDT02 as depth evidence.
