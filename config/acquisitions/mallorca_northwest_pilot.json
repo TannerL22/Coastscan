@@ -19,6 +19,7 @@
       "resources": [
         {
           "resource_name": "LC.zip",
+          "method": "cnig_catalogue",
           "cnig_sequential_id": "9000006",
           "local_relative_path": "data/raw/coastline/LC.zip",
           "expected_checksum": "7393e14ca120596d607e68fc0be69e734414a658c447b2f304dd7d5c2ffb11a6",
@@ -40,6 +41,7 @@
       "resources": [
         {
           "resource_name": "LINEAS_LIMITE.zip",
+          "method": "cnig_catalogue",
           "cnig_sequential_id": "9000029",
           "local_relative_path": "data/raw/boundaries/LINEAS_LIMITE.zip",
           "expected_checksum": "d2c5ee140e7f48b3a5fc177b7c2bb05b757472e349290d0d0065d9c562f891da",
@@ -59,8 +61,35 @@
       "required_attribution": "Obra derivada de MDT02-cob2 2015-2021 CC-BY 4.0 ign.es",
       "remote_metadata": {"format": "COG", "native_crs": "EPSG:25831", "horizontal_resolution_m": 2, "vertical_units": "orthometric metres", "water_surface_reliability": "low; interpolated constant elevations may occur"},
       "resources": [
-        {"resource_name": "MDT02-ETRS89-HU31-0643-4-COB2.TIF", "cnig_sequential_id": "11411721", "local_relative_path": "data/raw/elevation/mdt02/MDT02-ETRS89-HU31-0643-4-COB2.TIF", "expected_checksum": "c81d1f23cd6094d63810852552d109ec22f34593fa491aa643a8384a6cc56e2e"},
-        {"resource_name": "MDT02-ETRS89-HU31-0670-2-COB2.TIF", "cnig_sequential_id": "11411732", "local_relative_path": "data/raw/elevation/mdt02/MDT02-ETRS89-HU31-0670-2-COB2.TIF", "expected_checksum": "736ae763777cd3a1162632bf4076619d15b193e9b47e2f69f9b59f7676119db3"}
+        {"resource_name": "MDT02-ETRS89-HU31-0643-4-COB2.TIF", "method": "cnig_catalogue", "cnig_sequential_id": "11411721", "local_relative_path": "data/raw/elevation/mdt02/MDT02-ETRS89-HU31-0643-4-COB2.TIF", "expected_checksum": "c81d1f23cd6094d63810852552d109ec22f34593fa491aa643a8384a6cc56e2e"},
+        {"resource_name": "MDT02-ETRS89-HU31-0670-2-COB2.TIF", "method": "cnig_catalogue", "cnig_sequential_id": "11411732", "local_relative_path": "data/raw/elevation/mdt02/MDT02-ETRS89-HU31-0670-2-COB2.TIF", "expected_checksum": "736ae763777cd3a1162632bf4076619d15b193e9b47e2f69f9b59f7676119db3"}
+      ]
+    },
+    {
+      "source_id": "emodnet_dtm_2024_lat",
+      "provider": "EMODnet Bathymetry",
+      "product_name": "Digital Bathymetry DTM",
+      "product_version": "2024",
+      "edition_date": "2025-03-24",
+      "official_product_reference": "https://doi.org/10.12770/cf51df64-56f9-4a99-b1aa-36b8d7b743a1",
+      "licence": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+      "required_attribution": "This data product was created by EMODnet (https://emodnet.ec.europa.eu/en/), and is owned by the EU and licensed under the Creative Commons Attribution 4.0 International (CC BY 4.0) license.",
+      "remote_metadata": {
+        "service": "Official EMODnet ERDDAP griddap",
+        "native_crs": "EPSG:4326",
+        "native_resolution": "1/16 arc-minute (~115 m)",
+        "vertical_datum": "LAT",
+        "doi": "10.12770/cf51df64-56f9-4a99-b1aa-36b8d7b743a1",
+        "safety_warning": "Not for navigation or any purpose relating to safety at sea"
+      },
+      "resources": [
+        {
+          "resource_name": "mallorca_northwest_subset.nc",
+          "method": "emodnet_product",
+          "url": "https://erddap.emodnet.eu/erddap/griddap/bathymetry_dtm_2024.nc?elevation[(39.74):1:(39.89)][(2.63):1:(2.83)],value_count[(39.74):1:(39.89)][(2.63):1:(2.83)],cdi_index[(39.74):1:(39.89)][(2.63):1:(2.83)],interpolation_flag[(39.74):1:(39.89)][(2.63):1:(2.83)],elevation_max[(39.74):1:(39.89)][(2.63):1:(2.83)],elevation_min[(39.74):1:(39.89)][(2.63):1:(2.83)],stdev[(39.74):1:(39.89)][(2.63):1:(2.83)]",
+          "local_relative_path": "data/raw/bathymetry/emodnet_dtm_2024/mallorca_northwest_subset.nc",
+          "expected_checksum": "053afb09d1c9a6d49161d7f4a62389c61c74a43f302307fdb5e783441500981f"
+        }
       ]
     }
   ]

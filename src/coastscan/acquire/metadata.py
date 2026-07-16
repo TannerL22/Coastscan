@@ -6,6 +6,7 @@ from pathlib import Path
 
 from coastscan.acquire.boundaries import create_documented_aoi
 from coastscan.acquire.cnig import download_cnig_resource, extract_zip_safely
+from coastscan.acquire.http import download_https_resource
 from coastscan.config import PROJECT_ROOT, load_region_config
 from coastscan.exceptions import AcquisitionError
 from coastscan.models.acquisition import RegionAcquisitionManifest
@@ -32,19 +33,37 @@ def acquire_region_data(
         raise AcquisitionError(f"No authoritative acquisition plan exists: {plan_path}")
     manifest = RegionAcquisitionManifest.model_validate_json(plan_path.read_text(encoding="utf-8"))
     errors: list[str] = []
+    manual: list[str] = []
     for source in manifest.sources:
         for resource in source.resources:
             destination = root / resource.local_relative_path
             try:
-                checksum, reused = download_cnig_resource(
-                    resource.cnig_sequential_id,
-                    destination,
-                    expected_checksum=resource.expected_checksum or resource.checksum,
-                    timeout_seconds=300,
-                )
+                if resource.method == "manual_request":
+                    resource.download_status = "manual_action_required"
+                    manual.append(resource.manual_instructions or resource.resource_name)
+                    continue
+                if resource.method == "cnig_catalogue":
+                    assert resource.cnig_sequential_id is not None
+                    checksum, reused = download_cnig_resource(
+                        resource.cnig_sequential_id,
+                        destination,
+                        expected_checksum=resource.expected_checksum or resource.checksum,
+                        timeout_seconds=300,
+                    )
+                    response_metadata = {"provider_method": "cnig_catalogue"}
+                else:
+                    assert resource.url is not None
+                    checksum, reused, response_metadata = download_https_resource(
+                        resource.url,
+                        destination,
+                        expected_checksum=resource.expected_checksum or resource.checksum,
+                        timeout_seconds=300,
+                    )
                 resource.checksum = checksum
                 resource.size_bytes = destination.stat().st_size
                 resource.download_status = "reused" if reused else "downloaded"
+                resource.retrieved_at_utc = datetime.now(UTC).isoformat()
+                resource.response_metadata = response_metadata
                 if resource.archive and resource.extract_to is not None:
                     extract_zip_safely(destination, root / resource.extract_to)
             except AcquisitionError as exc:
@@ -58,9 +77,9 @@ def acquire_region_data(
             config.area_of_interest.layer or "aoi",
         )
     manifest.retrieved_at_utc = datetime.now(UTC).isoformat()
-    manifest.download_status = "complete" if not errors else "incomplete"
-    manifest.manual_action_required = bool(errors)
-    manifest.notes.extend(errors)
+    manifest.download_status = "complete" if not errors and not manual else "incomplete"
+    manifest.manual_action_required = bool(errors or manual)
+    manifest.notes.extend([*manual, *errors])
     _write_manifest(manifest, output_path)
     if errors:
         raise AcquisitionError("; ".join(errors))

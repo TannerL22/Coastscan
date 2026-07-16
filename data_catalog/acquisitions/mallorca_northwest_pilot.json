@@ -5,7 +5,7 @@
     "Resource identifiers were discovered through the public CNIG product catalogue for the documented AOI."
   ],
   "region_id": "mallorca_northwest_pilot",
-  "retrieved_at_utc": "2026-07-16T11:46:17.745470+00:00",
+  "retrieved_at_utc": "2026-07-16T14:18:13.051206+00:00",
   "sources": [
     {
       "edition_date": "2022-06",
@@ -30,8 +30,15 @@
           "expected_checksum": "7393e14ca120596d607e68fc0be69e734414a658c447b2f304dd7d5c2ffb11a6",
           "extract_to": "data\\raw\\coastline\\LC",
           "local_relative_path": "data\\raw\\coastline\\LC.zip",
+          "manual_instructions": null,
+          "method": "cnig_catalogue",
           "resource_name": "LC.zip",
-          "size_bytes": 36200191
+          "response_metadata": {
+            "provider_method": "cnig_catalogue"
+          },
+          "retrieved_at_utc": "2026-07-16T14:18:09.890706+00:00",
+          "size_bytes": 36200191,
+          "url": null
         }
       ],
       "source_id": "ihm_spain_coastline"
@@ -59,8 +66,15 @@
           "expected_checksum": "d2c5ee140e7f48b3a5fc177b7c2bb05b757472e349290d0d0065d9c562f891da",
           "extract_to": "data\\raw\\boundaries\\LINEAS_LIMITE",
           "local_relative_path": "data\\raw\\boundaries\\LINEAS_LIMITE.zip",
+          "manual_instructions": null,
+          "method": "cnig_catalogue",
           "resource_name": "LINEAS_LIMITE.zip",
-          "size_bytes": 143963710
+          "response_metadata": {
+            "provider_method": "cnig_catalogue"
+          },
+          "retrieved_at_utc": "2026-07-16T14:18:10.815509+00:00",
+          "size_bytes": 143963710,
+          "url": null
         }
       ],
       "source_id": "cnig_administrative_boundaries"
@@ -89,8 +103,15 @@
           "expected_checksum": "c81d1f23cd6094d63810852552d109ec22f34593fa491aa643a8384a6cc56e2e",
           "extract_to": null,
           "local_relative_path": "data\\raw\\elevation\\mdt02\\MDT02-ETRS89-HU31-0643-4-COB2.TIF",
+          "manual_instructions": null,
+          "method": "cnig_catalogue",
           "resource_name": "MDT02-ETRS89-HU31-0643-4-COB2.TIF",
-          "size_bytes": 8841927
+          "response_metadata": {
+            "provider_method": "cnig_catalogue"
+          },
+          "retrieved_at_utc": "2026-07-16T14:18:12.543092+00:00",
+          "size_bytes": 8841927,
+          "url": null
         },
         {
           "archive": false,
@@ -100,11 +121,57 @@
           "expected_checksum": "736ae763777cd3a1162632bf4076619d15b193e9b47e2f69f9b59f7676119db3",
           "extract_to": null,
           "local_relative_path": "data\\raw\\elevation\\mdt02\\MDT02-ETRS89-HU31-0670-2-COB2.TIF",
+          "manual_instructions": null,
+          "method": "cnig_catalogue",
           "resource_name": "MDT02-ETRS89-HU31-0670-2-COB2.TIF",
-          "size_bytes": 89239401
+          "response_metadata": {
+            "provider_method": "cnig_catalogue"
+          },
+          "retrieved_at_utc": "2026-07-16T14:18:12.921561+00:00",
+          "size_bytes": 89239401,
+          "url": null
         }
       ],
       "source_id": "cnig_mdt02_cob2"
+    },
+    {
+      "edition_date": "2025-03-24",
+      "licence": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+      "official_product_reference": "https://doi.org/10.12770/cf51df64-56f9-4a99-b1aa-36b8d7b743a1",
+      "product_name": "Digital Bathymetry DTM",
+      "product_version": "2024",
+      "provider": "EMODnet Bathymetry",
+      "remote_metadata": {
+        "doi": "10.12770/cf51df64-56f9-4a99-b1aa-36b8d7b743a1",
+        "native_crs": "EPSG:4326",
+        "native_resolution": "1/16 arc-minute (~115 m)",
+        "safety_warning": "Not for navigation or any purpose relating to safety at sea",
+        "service": "Official EMODnet ERDDAP griddap",
+        "vertical_datum": "LAT"
+      },
+      "required_attribution": "This data product was created by EMODnet (https://emodnet.ec.europa.eu/en/), and is owned by the EU and licensed under the Creative Commons Attribution 4.0 International (CC BY 4.0) license.",
+      "resources": [
+        {
+          "archive": false,
+          "checksum": "053afb09d1c9a6d49161d7f4a62389c61c74a43f302307fdb5e783441500981f",
+          "cnig_sequential_id": null,
+          "download_status": "reused",
+          "expected_checksum": "053afb09d1c9a6d49161d7f4a62389c61c74a43f302307fdb5e783441500981f",
+          "extract_to": null,
+          "local_relative_path": "data\\raw\\bathymetry\\emodnet_dtm_2024\\mallorca_northwest_subset.nc",
+          "manual_instructions": null,
+          "method": "emodnet_product",
+          "resource_name": "mallorca_northwest_subset.nc",
+          "response_metadata": {
+            "url": "https://erddap.emodnet.eu/erddap/griddap/bathymetry_dtm_2024.nc?elevation[(39.74):1:(39.89)][(2.63):1:(2.83)],value_count[(39.74):1:(39.89)][(2.63):1:(2.83)],cdi_index[(39.74):1:(39.89)][(2.63):1:(2.83)],interpolation_flag[(39.74):1:(39.89)][(2.63):1:(2.83)],elevation_max[(39.74):1:(39.89)][(2.63):1:(2.83)],elevation_min[(39.74):1:(39.89)][(2.63):1:(2.83)],stdev[(39.74):1:(39.89)][(2.63):1:(2.83)]",
+            "validation": "local checksum"
+          },
+          "retrieved_at_utc": "2026-07-16T14:18:12.921561+00:00",
+          "size_bytes": 709876,
+          "url": "https://erddap.emodnet.eu/erddap/griddap/bathymetry_dtm_2024.nc?elevation[(39.74):1:(39.89)][(2.63):1:(2.83)],value_count[(39.74):1:(39.89)][(2.63):1:(2.83)],cdi_index[(39.74):1:(39.89)][(2.63):1:(2.83)],interpolation_flag[(39.74):1:(39.89)][(2.63):1:(2.83)],elevation_max[(39.74):1:(39.89)][(2.63):1:(2.83)],elevation_min[(39.74):1:(39.89)][(2.63):1:(2.83)],stdev[(39.74):1:(39.89)][(2.63):1:(2.83)]"
+        }
+      ],
+      "source_id": "emodnet_dtm_2024_lat"
     }
   ]
 }
