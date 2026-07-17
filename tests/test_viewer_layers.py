@@ -44,7 +44,7 @@ def test_segment_layer_retains_ids_metric_geometry_and_tooltip(viewer_project: P
     assert features[0]["geometry"]["type"] == "LineString"
     encoded = json.loads(result.layer.to_json())
     assert encoded["@@type"] == "PathLayer"
-    assert encoded["widthUnits"] == "@@=pixels"
+    assert encoded["widthUnits"] == "pixels"
     assert "filled" not in encoded
     assert len(result.path_records) == 12
     assert data.display_segments.crs.to_epsg() == 4326
@@ -65,6 +65,7 @@ def test_transect_layer_can_be_selected_only_and_flags_build(viewer_project: Pat
     assert layer is not None
     encoded = json.loads(layer.to_json())
     assert encoded["id"] == "bathymetry-transects"
+    assert encoded["widthUnits"] == "pixels"
     assert len(encoded["data"]) == 2
     flags = build_flag_layers(
         data.display_segments,
@@ -77,7 +78,24 @@ def test_transect_layer_can_be_selected_only_and_flags_build(viewer_project: Pat
         "flag-source_mismatch",
     }
     assert all(json.loads(item.to_json())["@@type"] == "PathLayer" for item in flags)
+    assert all(json.loads(item.to_json())["widthUnits"] == "pixels" for item in flags)
     assert all("filled" not in json.loads(item.to_json()) for item in flags)
+
+    metric = metric_definition("slope_p90_deg")
+    assert metric is not None
+    deck, _ = build_deck(
+        data.display_segments,
+        metric,
+        "full",
+        transects=transects,
+        flags={"ambiguous"},
+        show_midpoints=True,
+    )
+    deck_json = deck.to_json()
+    assert "@@=pixels" not in deck_json
+    deck_payload = json.loads(deck_json)
+    midpoint = next(item for item in deck_payload["layers"] if item["id"] == "segment-midpoints")
+    assert midpoint["radiusUnits"] == "pixels"
 
 
 def test_deck_defaults_to_no_secret_carto_and_supports_categorical(viewer_project: Path) -> None:

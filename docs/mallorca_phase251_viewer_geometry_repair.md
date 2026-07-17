@@ -48,16 +48,20 @@ bounds and declared an unfilled, stroked `GeoJsonLayer`. The existing view-state
 the correct bounds. The official raw coastline inspection reported 141 EPSG:4326 LineStrings before
 configured filtering, approximately 29.10 km after clipping, and a valid intersecting land mask.
 
-The first representation inconsistent with the observed browser result was therefore after the correct
-PyDeck JSON payload: browser-side deck.gl interpretation of the `GeoJsonLayer`. No analytical geometry,
-CRS, attribute join or Shapely conversion corruption was found.
+The first representation inconsistent with the observed browser result was the PyDeck layer payload.
+PyDeck treats an unquoted Python string as a JavaScript accessor, so the intended deck.gl enum
+`width_units="pixels"` was serialized as `widthUnits: "@@=pixels"`, not the literal
+`widthUnits: "pixels"`. Deck.gl therefore did not receive a valid unit enum. With rounded caps and
+short paths, the resulting widths appeared as the large discs/fans in the browser. No analytical
+geometry, CRS, attribute join or Shapely conversion corruption was found.
 
 ## Root cause and narrow repair
 
-The defect was a rendering-path incompatibility: valid unfilled GeoJSON line features were reaching the
-browser, but that environment rendered them as malformed fan/polygon-like shapes. Existing tests only
-asserted that a GeoJSON LineString existed and that Streamlit created a chart. They did not assert
-independent path records, browser-visible bounds or absence of polygon-capable rendering.
+The defect was incorrect unit serialization at the viewer/rendering boundary. Valid line geometry was
+reaching the browser, but the layer width unit was an accessor expression rather than a literal enum.
+The first repair changed GeoJSON transport to independent paths but initially retained the same
+unquoted-unit defect. Its tests also asserted the broken `"@@=pixels"` payload, creating a false
+positive. The user's first post-repair screenshot exposed that gap.
 
 The narrowest defensible repair replaces only line transport/render construction. Every authoritative
 LineString is now one PyDeck `PathLayer` record. Each MultiLineString part becomes a separate record
@@ -65,6 +69,12 @@ with a stable parent `segment_id` and component index; parts are never concatena
 properties, selection widths and the existing metric registry are unchanged. Flag overlays use the
 same authoritative paths as wider unfilled PathLayers. Bathymetry transects remain independent
 PathLayer records.
+
+All deck.gl pixel-unit properties now use the quoted PyDeck value `"'pixels'"`; PyDeck strips those
+protective quotes and emits the required literal JSON value `"pixels"`. Regression tests inspect the
+serialized deck payload, require literal `widthUnits`/`radiusUnits`, and reject `"@@=pixels"` anywhere
+in it. The Streamlit chart key is versioned for this contract change so an existing browser session
+cannot retain malformed layer or camera state after deployment.
 
 ## Authoritative geometry and validation contract
 
@@ -124,19 +134,23 @@ It reports validation `pass`, 174/174 exact authoritative/attribute geometry mat
 coordinates, zero out-of-AOI segments, a maximum segment coordinate jump of 134.018 m and 739 validated
 independent transects.
 
-Because no browser backend was available, hover pixels, pointer map-click selection, named-place visual
-alignment and a genuine `viewer_after_repair.png` remain a manual visual gate. Searchable-ID selection,
+The in-app browser backend remained unavailable, so the final visual gate was completed with the
+user's real browser. A screenshot after a clean server restart shows the 174 coloured short paths
+following northwest Mallorca's coastline at a useful local zoom, with no large discs or polygons.
+The preceding screenshot was traced to a Streamlit process started before the unit fix; the exact stale
+process tree was stopped, port 8501 was verified clear and the repaired server was started afresh before
+the successful screenshot. No screenshot file is committed to the repository. Searchable-ID selection,
 filtering, selection styling, tooltip payload content, transects, overlays and the Data Quality payload
-were verified programmatically. The absent screenshot must not be interpreted as a successful visual
-claim.
+were verified programmatically.
 
 ## Tests and limitations
 
 New tests cover authoritative geometry precedence, reordered and deliberately corrupt attribute
 geometry, one-to-one ID errors, duplicates, missing/incorrect CRS, non-mutating reprojection, AOI and
 world-coordinate bounds, coordinate jumps, LineString/MultiLineString path independence, selection
-styling, pixel widths, unfilled rendering, flag paths, fit bounds, transects and actionable Streamlit
-errors. The final suite passed 108 tests with no failures or skips and 16 pre-existing NumPy
+styling, literal pixel-unit serialization, rejection of accessor-style unit values, unfilled rendering,
+flag paths, fit bounds, transects and actionable Streamlit errors. The final suite passed 108 tests
+with no failures or skips and 16 pre-existing NumPy
 masked-array deprecation warnings. Ruff format/lint, MyPy across 62 source files and `uv build` passed.
 
 Protected analytical SHA-256 values were identical before and after:

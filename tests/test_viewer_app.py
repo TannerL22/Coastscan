@@ -31,7 +31,7 @@ def test_application_starts_controls_map_and_filters(viewer_project: Path, monke
         layer for layer in payload["layers"] if layer["id"] == "coastline-segments"
     )
     assert segment_layer["@@type"] == "PathLayer"
-    assert segment_layer["widthUnits"] == "@@=pixels"
+    assert segment_layer["widthUnits"] == "pixels"
     assert "filled" not in segment_layer
     visible = next(metric for metric in app.metric if metric.label == "Visible")
     assert visible.value == "12"

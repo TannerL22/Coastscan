@@ -19,6 +19,9 @@ from coastscan.viewer.validation import (
 )
 
 MISSING_COLOR = [150, 155, 165, 210]
+# PyDeck treats unquoted strings as JavaScript accessors. Deck.gl unit enums must
+# therefore retain quotes until Layer strips them into literal JSON strings.
+PIXEL_UNITS = "'pixels'"
 SEQUENTIAL_PALETTE = [
     [68, 1, 84, 230],
     [59, 82, 139, 230],
@@ -222,7 +225,7 @@ def build_segment_layer(
         get_path="path",
         get_color="display_color",
         get_width="line_width",
-        width_units="pixels",
+        width_units=PIXEL_UNITS,
         width_min_pixels=3,
         cap_rounded=True,
         joint_rounded=True,
@@ -298,7 +301,7 @@ def build_flag_layers(frame: gpd.GeoDataFrame, enabled_flags: set[str]) -> list[
                 get_path="path",
                 get_color=FLAG_COLORS[flag],
                 get_width=9,
-                width_units="pixels",
+                width_units=PIXEL_UNITS,
                 width_min_pixels=8,
                 opacity=0.7,
                 cap_rounded=True,
@@ -338,7 +341,7 @@ def build_transect_layer(transects: gpd.GeoDataFrame) -> pdk.Layer | None:
         get_path="path",
         get_color="color",
         get_width=2,
-        width_units="pixels",
+        width_units=PIXEL_UNITS,
         width_min_pixels=1,
         opacity=0.45,
     )
@@ -364,7 +367,7 @@ def build_midpoint_layer(frame: gpd.GeoDataFrame) -> pdk.Layer | None:
         get_line_color=[45, 55, 65, 230],
         stroked=True,
         get_radius=22,
-        radius_units="pixels",
+        radius_units=PIXEL_UNITS,
         radius_min_pixels=3,
     )
 

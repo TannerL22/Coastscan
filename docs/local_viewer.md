@@ -85,8 +85,11 @@ button resets every filter widget.
 The main map uses a PyDeck `PathLayer`. Each LineString becomes one longitude/latitude path record;
 each MultiLineString component becomes an independent record carrying the same stable parent
 `segment_id`, component index, colour, tooltip values and selection width. Components are never
-concatenated. This avoids the browser-side malformed line interpretation observed with the original
-`GeoJsonLayer`, while preserving Streamlit's documented
+concatenated. Deck.gl unit enums are deliberately serialized as literal strings: PyDeck treats an
+unquoted Python string as a JavaScript accessor, so `"pixels"` would become the invalid
+`"@@=pixels"` expression and inflate short rounded paths into large discs. Regression tests reject
+that payload. The stateful chart key is versioned when this contract changes so an existing browser
+session cannot retain the malformed layer/camera state. The map preserves Streamlit's documented
 `st.pydeck_chart(..., on_select="rerun")` selection state. A searchable segment selector and a
 selectable filtered table remain reliable alternatives. The selected segment is emphasized across all
 of its components and receives the existing detail panels.
