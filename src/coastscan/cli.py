@@ -140,5 +140,23 @@ def view_map_command(
         raise typer.Exit(code=2) from None
 
 
+@app.command("inspect-viewer-geometry")
+def inspect_viewer_geometry_command(
+    region: str = typer.Option(..., "--region", help="Region ID with processed viewer outputs"),
+    verbose: bool = typer.Option(False, "--verbose"),
+) -> None:
+    """Validate authoritative viewer geometry, joins, bounds and transects."""
+    try:
+        from coastscan.viewer.diagnostics import inspect_viewer_geometry
+
+        result = inspect_viewer_geometry(region)
+        console.print_json(json.dumps(result))
+    except CoastScanError as exc:
+        console.print(f"[red]{exc}[/red]")
+        if verbose:
+            raise
+        raise typer.Exit(code=2) from None
+
+
 if __name__ == "__main__":
     app()

@@ -196,7 +196,11 @@ def viewer_project(tmp_path: Path) -> Path:
     source = Path(__file__).parents[1] / "data" / "fixtures" / "viewer_demo"
     destination = tmp_path / "data" / "processed" / "viewer_demo"
     destination.mkdir(parents=True)
-    for name in ("segment_features_phase2.parquet", "bathymetry_transects.parquet"):
+    for name in (
+        "coast_segments.parquet",
+        "segment_features_phase2.parquet",
+        "bathymetry_transects.parquet",
+    ):
         payload = (source / name).read_bytes()
         (destination / name).write_bytes(payload)
         assert sha256_file(source / name) == sha256_file(destination / name)
@@ -205,14 +209,9 @@ def viewer_project(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def terrain_only_viewer_project(tmp_path: Path) -> Path:
-    source = (
-        Path(__file__).parents[1]
-        / "data"
-        / "fixtures"
-        / "viewer_terrain_only"
-        / "segment_features.parquet"
-    )
+    source_directory = Path(__file__).parents[1] / "data" / "fixtures" / "viewer_terrain_only"
     destination = tmp_path / "data" / "processed" / "viewer_terrain_only"
     destination.mkdir(parents=True)
-    (destination / source.name).write_bytes(source.read_bytes())
+    for name in ("coast_segments.parquet", "segment_features.parquet"):
+        (destination / name).write_bytes((source_directory / name).read_bytes())
     return tmp_path

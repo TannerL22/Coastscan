@@ -17,6 +17,8 @@ Presentation files live under `apps/coastscan_viewer/`:
 Testable viewer logic lives under `src/coastscan/viewer/`:
 
 - `data.py` discovers, validates, hashes, caches and reprojects inputs.
+- `validation.py` enforces projected line, WGS84 coordinate, AOI and transect contracts.
+- `diagnostics.py` reports the geometry/attribute contract without rebuilding analytical data.
 - `metrics.py` owns every map label, unit, description, format and interpretation boundary.
 - `filters.py` applies non-mutating geometry, terrain, bathymetry and search filters.
 - `layers.py` creates colour scales and PyDeck segment/transect/flag/midpoint layers.
@@ -26,18 +28,34 @@ Testable viewer logic lives under `src/coastscan/viewer/`:
 
 ## Inputs and immutable display transformation
 
-The preferred input is:
+Display geometry always comes from:
+
+```text
+data/processed/<region>/coast_segments.parquet
+```
+
+The preferred attribute input is:
 
 ```text
 data/processed/<region>/segment_features_phase2.parquet
 ```
 
-The viewer also uses `bathymetry_transects.parquet` when requested. If the joined Phase 2 table is
-absent, `segment_features.parquet` enables terrain-only mode. GeoParquet CRS metadata is mandatory.
-The projected analytical frame is retained in memory, while a separate display frame is transformed to
-EPSG:4326 for deck.gl. Source files are never written or simplified.
+The loader validates one unique row per `segment_id` in the coastline and attribute inputs, requires
+identical ID sets, drops every geometry-typed attribute column and performs a one-to-one ID join. It
+then explicitly constructs a GeoDataFrame using only the authoritative coastline geometry and its
+projected CRS. Attribute row order and attribute geometry therefore cannot change the map. If the
+Phase 2 attribute table is absent, `segment_features.parquet` enables the same contract in terrain-only
+mode.
 
-`st.cache_data` keys include the absolute path, file size, nanosecond modification time and SHA-256.
+Before display conversion, validation requires non-empty valid LineString or MultiLineString geometry,
+a projected CRS, finite coordinates, reasonable segment lengths and no large coordinate jumps. Where
+a configured AOI exists, segments must intersect a documented buffer, their aggregate bounds must not
+materially exceed that buffered AOI and their centroid must remain close to it. Conversion uses
+`to_crs("EPSG:4326")` on a separate in-memory copy; the projected analytical frame and every source file
+remain unchanged. WGS84 longitude/latitude ranges and finite values are checked before layer creation.
+
+`st.cache_data` keys include absolute paths, sizes, nanosecond modification times and SHA-256 for both
+the authoritative geometry and attribute files (and the AOI when present).
 Transects are loaded lazily and normally filtered to the selected segment. This is appropriate for the
 174-segment pilot and remains practical for several thousand segments without adding a database or tile
 server.
@@ -64,16 +82,28 @@ button resets every filter widget.
 
 ## Layers and selection
 
-The main `GeoJsonLayer` preserves stable `segment_id`, exposes a concise tooltip and supports
-Streamlit's documented `st.pydeck_chart(..., on_select="rerun")` selection state. A searchable segment
-selector and a selectable filtered table provide reliable alternatives. The selected segment is
-emphasized and receives identity/provenance, terrain, bathymetry and deterministic interpretation
-panels.
+The main map uses a PyDeck `PathLayer`. Each LineString becomes one longitude/latitude path record;
+each MultiLineString component becomes an independent record carrying the same stable parent
+`segment_id`, component index, colour, tooltip values and selection width. Components are never
+concatenated. Deck.gl unit enums are deliberately serialized as literal strings: PyDeck treats an
+unquoted Python string as a JavaScript accessor, so `"pixels"` would become the invalid
+`"@@=pixels"` expression and inflate short rounded paths into large discs. Regression tests reject
+that payload. The stateful chart key is versioned when this contract changes so an existing browser
+session cannot retain the malformed layer/camera state. The map preserves Streamlit's documented
+`st.pydeck_chart(..., on_select="rerun")` selection state. A searchable segment selector and a
+selectable filtered table remain reliable alternatives. The selected segment is emphasized across all
+of its components and receives the existing detail panels.
 
-Dedicated `PathLayer` bathymetry transects are off by default and can show the selected segment or all
-visible segments. Flag overlays cover ambiguity, source mismatch, large coastal gaps, missing terrain,
-missing bathymetry and fallback/background bathymetry. Optional midpoint markers make narrow segments
-easier to locate.
+Bathymetry transects are validated as independent LineStrings: their CRS and WGS84 coordinates must be
+plausible, their parent IDs must exist, their origins must remain close to the authoritative parent
+segment, extreme jumps fail and ambiguous parents remain excluded. Dedicated `PathLayer` transects are
+off by default and can show the selected segment or all visible segments. Every flag overlay is another
+unfilled `PathLayer` built from the exact authoritative segment components; overlays cannot introduce
+new geometry or alter the extent.
+
+Initial view state is calculated from visible WGS84 bounds using deterministic Web Mercator fit-bounds
+math for the viewer's map dimensions and padding. Empty and single-segment states are handled
+explicitly.
 
 Filtered CSV export excludes geometry and prefixes regional proxy fields with `regional_proxy__`.
 
@@ -99,6 +129,16 @@ uv run streamlit run apps/coastscan_viewer/app.py -- --region mallorca_northwest
 
 The launcher invokes `sys.executable -m streamlit` with an argument list and no shell-specific quoting.
 
+Validate a region before launch with:
+
+```powershell
+uv run coastscan inspect-viewer-geometry --region mallorca_northwest_pilot
+```
+
+The command reports authoritative and attribute paths/checksums, CRS, native/WGS84/AOI bounds, counts,
+ID and geometry agreement, length distribution, invalid coordinate and out-of-AOI counts, maximum
+coordinate jump, transect independence and the final validation result.
+
 ## Testing
 
 The committed synthetic fixture represents high/low relief, resolved/fallback/ambiguous orientation,
@@ -110,9 +150,11 @@ Mallorca controls and pages.
 
 ## Known limitations and safety boundary
 
-Streamlit/PyDeck displays line selection but does not provide production vector tiles or offline map
+Streamlit/PyDeck click selection can vary with the browser integration, so the ID selector and table
+remain supported fallbacks. The viewer does not provide production vector tiles or offline map
 packaging. CARTO and optional satellite tiles require internet access even though the analytical data
-remain local. The viewer does not persist sessions outside the local Streamlit process.
+remain local. Fit-bounds uses a representative 1200 Ã— 650 pixel viewport rather than measuring every
+client window. The viewer does not persist sessions outside the local Streamlit process.
 
 Terrain is terrestrial only. Regional bathymetry does not measure water beneath an individual cliff,
 EMODnet is not navigation data, coarse cells may contain fallback or interpolated evidence, submerged

@@ -576,7 +576,9 @@ _render_legend(visible, selected_metric_field, scale)
 
 map_event = st.pydeck_chart(
     deck,
-    key="coastscan_map",
+    # Version the stateful chart key when its deck.gl contract changes so a
+    # browser cannot retain the old malformed camera/layer state.
+    key="coastscan_map_phase251_literal_units",
     on_select="rerun",
     selection_mode="single-object",
     width="stretch",
