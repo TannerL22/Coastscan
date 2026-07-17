@@ -13,6 +13,10 @@ from shapely.geometry import mapping
 from coastscan.viewer.formatting import format_value
 from coastscan.viewer.metrics import metric_definition
 from coastscan.viewer.models import ColorScale, MetricDefinition, ScaleMode
+from coastscan.viewer.validation import (
+    line_parts,
+    validate_display_line_geometry,
+)
 
 MISSING_COLOR = [150, 155, 165, 210]
 SEQUENTIAL_PALETTE = [
@@ -66,6 +70,7 @@ class SegmentLayerResult:
     layer: pdk.Layer
     scale: ColorScale | None
     feature_collection: dict[str, Any]
+    path_records: list[dict[str, object]]
 
 
 def continuous_scale(
@@ -169,8 +174,7 @@ def build_segment_layer(
     *,
     selected_segment_id: str | None = None,
 ) -> SegmentLayerResult:
-    if str(frame.crs).upper() != "EPSG:4326":
-        raise ValueError("Map layers require EPSG:4326 display geometry")
+    validate_display_line_geometry(frame, label="Coastline segment layer")
     scale: ColorScale | None = None
     if metric.kind == "continuous":
         scale = continuous_scale(
@@ -179,6 +183,7 @@ def build_segment_layer(
             diverging=metric.recommended_scale == "diverging",
         )
     features: list[dict[str, object]] = []
+    path_records: list[dict[str, object]] = []
     for _, row in frame.iterrows():
         color = (
             continuous_color(
@@ -189,30 +194,40 @@ def build_segment_layer(
             if scale is not None
             else categorical_color(metric.field_name, row.get(metric.field_name))
         )
+        properties = _segment_properties(row, metric, color, selected_segment_id)
         features.append(
             {
                 "type": "Feature",
                 "id": str(row.segment_id),
                 "geometry": mapping(row.geometry),
-                "properties": _segment_properties(row, metric, color, selected_segment_id),
+                "properties": properties,
             }
         )
+        for component_index, part in enumerate(line_parts(row.geometry)):
+            path_records.append(
+                {
+                    **properties,
+                    "component_index": component_index,
+                    "path": [[float(x), float(y)] for x, y, *_ in part.coords],
+                }
+            )
     collection: dict[str, Any] = {"type": "FeatureCollection", "features": features}
     layer = pdk.Layer(
-        "GeoJsonLayer",
+        "PathLayer",
         id="coastline-segments",
-        data=collection,
+        data=path_records,
         pickable=True,
         auto_highlight=True,
         highlight_color=[255, 255, 255, 230],
-        stroked=True,
-        filled=False,
-        get_line_color="properties.display_color",
-        get_line_width="properties.line_width",
-        line_width_units="pixels",
-        line_width_min_pixels=3,
+        get_path="path",
+        get_color="display_color",
+        get_width="line_width",
+        width_units="pixels",
+        width_min_pixels=3,
+        cap_rounded=True,
+        joint_rounded=True,
     )
-    return SegmentLayerResult(layer, scale, collection)
+    return SegmentLayerResult(layer, scale, collection, path_records)
 
 
 def _flag_mask(frame: gpd.GeoDataFrame, flag: str) -> pd.Series:
@@ -258,35 +273,36 @@ FLAG_COLORS = {
 
 
 def build_flag_layers(frame: gpd.GeoDataFrame, enabled_flags: set[str]) -> list[pdk.Layer]:
+    validate_display_line_geometry(frame, label="Coastline flag layers")
     layers: list[pdk.Layer] = []
     for flag in sorted(enabled_flags):
         subset = frame.loc[_flag_mask(frame, flag)]
         if subset.empty:
             continue
-        collection = {
-            "type": "FeatureCollection",
-            "features": [
-                {
-                    "type": "Feature",
-                    "id": str(row.segment_id),
-                    "geometry": mapping(row.geometry),
-                    "properties": {"segment_id": str(row.segment_id), "flag": flag},
-                }
-                for _, row in subset.iterrows()
-            ],
-        }
+        records = [
+            {
+                "segment_id": str(row.segment_id),
+                "component_index": component_index,
+                "flag": flag,
+                "path": [[float(x), float(y)] for x, y, *_ in part.coords],
+            }
+            for _, row in subset.iterrows()
+            for component_index, part in enumerate(line_parts(row.geometry))
+        ]
         layers.append(
             pdk.Layer(
-                "GeoJsonLayer",
+                "PathLayer",
                 id=f"flag-{flag}",
-                data=collection,
+                data=records,
                 pickable=False,
-                stroked=True,
-                filled=False,
-                get_line_color=FLAG_COLORS[flag],
-                line_width_units="pixels",
-                line_width_min_pixels=8,
+                get_path="path",
+                get_color=FLAG_COLORS[flag],
+                get_width=9,
+                width_units="pixels",
+                width_min_pixels=8,
                 opacity=0.7,
+                cap_rounded=True,
+                joint_rounded=True,
             )
         )
     return layers
@@ -295,6 +311,11 @@ def build_flag_layers(frame: gpd.GeoDataFrame, enabled_flags: set[str]) -> list[
 def build_transect_layer(transects: gpd.GeoDataFrame) -> pdk.Layer | None:
     if transects.empty:
         return None
+    validate_display_line_geometry(
+        transects,
+        label="Bathymetry transect layer",
+        maximum_jump_km=5.0,
+    )
     records: list[dict[str, object]] = []
     for _, row in transects.iterrows():
         coords = [[float(x), float(y)] for x, y in row.geometry.coords]
@@ -352,8 +373,19 @@ def initial_view_state(frame: gpd.GeoDataFrame) -> pdk.ViewState:
     if frame.empty:
         return pdk.ViewState(latitude=39.82, longitude=2.73, zoom=9)
     left, bottom, right, top = frame.total_bounds
-    span = max(float(right - left), float(top - bottom), 0.001)
-    zoom = min(15.0, max(7.0, math.log2(360.0 / span) - 1.0))
+    longitude_span = max(float(right - left) / 360.0, 1e-9)
+
+    def mercator_y(latitude: float) -> float:
+        clipped = min(85.051129, max(-85.051129, latitude))
+        radians = math.radians(clipped)
+        return (1.0 - math.asinh(math.tan(radians)) / math.pi) / 2.0
+
+    latitude_span = max(abs(mercator_y(float(top)) - mercator_y(float(bottom))), 1e-9)
+    usable_width = 1_200.0 * 0.72
+    usable_height = 650.0 * 0.72
+    zoom_x = math.log2(usable_width / (512.0 * longitude_span))
+    zoom_y = math.log2(usable_height / (512.0 * latitude_span))
+    zoom = min(16.0, max(1.0, min(zoom_x, zoom_y)))
     return pdk.ViewState(
         longitude=float((left + right) / 2),
         latitude=float((bottom + top) / 2),

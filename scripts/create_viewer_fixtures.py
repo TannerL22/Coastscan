@@ -7,7 +7,7 @@ import numpy as np
 from shapely.geometry import LineString
 
 
-def create(root: Path) -> tuple[Path, Path, Path]:
+def create(root: Path) -> tuple[Path, ...]:
     fixture = root / "data" / "fixtures" / "viewer_demo"
     terrain_fixture = root / "data" / "fixtures" / "viewer_terrain_only"
     fixture.mkdir(parents=True, exist_ok=True)
@@ -96,6 +96,9 @@ def create(root: Path) -> tuple[Path, Path, Path]:
         rows.append(row)
         geometries.append(geometry)
     phase2 = gpd.GeoDataFrame(rows, geometry=geometries, crs="EPSG:3857")
+    coast_segments = phase2[["segment_id", "geometry"]].copy()
+    coast_path = fixture / "coast_segments.parquet"
+    coast_segments.to_parquet(coast_path, index=False)
     phase2_path = fixture / "segment_features_phase2.parquet"
     phase2.to_parquet(phase2_path, index=False)
     terrain_fields = [
@@ -118,6 +121,8 @@ def create(root: Path) -> tuple[Path, Path, Path]:
     ]
     terrain_path = terrain_fixture / "segment_features.parquet"
     phase2[terrain_fields].to_parquet(terrain_path, index=False)
+    terrain_coast_path = terrain_fixture / "coast_segments.parquet"
+    coast_segments.to_parquet(terrain_coast_path, index=False)
 
     transect_rows: list[dict[str, object]] = []
     for row, geometry in zip(rows, geometries, strict=True):
@@ -144,7 +149,7 @@ def create(root: Path) -> tuple[Path, Path, Path]:
     gpd.GeoDataFrame(transect_rows, geometry="geometry", crs="EPSG:3857").to_parquet(
         transect_path, index=False
     )
-    return phase2_path, transect_path, terrain_path
+    return phase2_path, coast_path, transect_path, terrain_path, terrain_coast_path
 
 
 if __name__ == "__main__":

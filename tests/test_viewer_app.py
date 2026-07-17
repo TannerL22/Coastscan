@@ -1,5 +1,7 @@
+import json
 from pathlib import Path
 
+import geopandas as gpd
 from streamlit.testing.v1 import AppTest
 
 from coastscan.viewer.launcher import build_streamlit_command
@@ -24,8 +26,22 @@ def test_application_starts_controls_map_and_filters(viewer_project: Path, monke
     assert app.selectbox(key="viewer_metric")
     assert app.selectbox(key="viewer_basemap").value == "CARTO Light"
     assert app.get("deck_gl_json_chart")
+    payload = json.loads(app.get("deck_gl_json_chart")[0].proto.json)
+    segment_layer = next(
+        layer for layer in payload["layers"] if layer["id"] == "coastline-segments"
+    )
+    assert segment_layer["@@type"] == "PathLayer"
+    assert segment_layer["widthUnits"] == "@@=pixels"
+    assert "filled" not in segment_layer
     visible = next(metric for metric in app.metric if metric.label == "Visible")
     assert visible.value == "12"
+
+    app.selectbox(key="viewer_metric").select("slope_p90_deg").run()
+    assert not app.exception
+
+    app.selectbox(key="segment_picker").select("viewer_demo_segment_00").run()
+    assert not app.exception
+    assert len(app.tabs) == 3
 
     app.text_input(key="filter_search").input("segment_00").run()
     assert not app.exception
@@ -74,3 +90,14 @@ def test_streamlit_command_uses_active_python_and_safe_arguments(tmp_path: Path)
     assert command[command.index("--server.headless") + 1] == "true"
     assert command[-3:] == ["--", "--region", "viewer_demo"]
     assert isinstance(command, list)
+
+
+def test_invalid_authoritative_geometry_is_actionable(viewer_project: Path, monkeypatch) -> None:
+    path = viewer_project / "data/processed/viewer_demo/coast_segments.parquet"
+    frame = gpd.read_parquet(path)
+    frame.set_crs(None, allow_override=True).to_parquet(path, index=False)
+    _configure(monkeypatch, viewer_project, "viewer_demo")
+    app = AppTest.from_file(APP_PATH, default_timeout=20).run()
+    assert not app.exception
+    assert any("no CRS metadata" in item.value for item in app.error)
+    assert not app.get("deck_gl_json_chart")

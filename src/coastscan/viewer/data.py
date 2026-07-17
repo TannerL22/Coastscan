@@ -6,12 +6,20 @@ from pathlib import Path
 from typing import Any, Literal
 
 import geopandas as gpd
+import pandas as pd
 import streamlit as st
 
 from coastscan.catalog.manifests import sha256_file
-from coastscan.config import PROJECT_ROOT, load_region_config
+from coastscan.config import PROJECT_ROOT, data_path, load_region_config
 from coastscan.exceptions import ConfigurationError, ViewerError
 from coastscan.viewer.models import ViewerData, ViewerPaths
+from coastscan.viewer.validation import (
+    GeometryValidationResult,
+    geometry_columns,
+    load_aoi,
+    validate_line_geometry,
+    validate_transect_geometry,
+)
 
 DISPLAY_CRS = "EPSG:4326"
 
@@ -47,29 +55,6 @@ uv run coastscan build-region --region {region_id} --write-samples
 uv run coastscan build-bathymetry --region {region_id} --write-samples"""
 
 
-def _validate_segments(frame: gpd.GeoDataFrame, path: Path) -> None:
-    if frame.crs is None:
-        raise ViewerError(f"Processed segment file has no CRS metadata: {path}")
-    if "segment_id" not in frame:
-        raise ViewerError(f"Processed segment file has no segment_id column: {path}")
-    duplicates = frame.loc[frame.segment_id.duplicated(), "segment_id"].astype(str).unique()
-    if len(duplicates):
-        raise ViewerError(
-            f"Processed segment file contains duplicate segment IDs: {', '.join(duplicates[:5])}"
-        )
-    if frame.empty:
-        raise ViewerError(f"Processed segment file contains no segments: {path}")
-    invalid = frame.geometry.isna() | frame.geometry.is_empty
-    if bool(invalid.any()):
-        raise ViewerError(f"Processed segment file contains missing or empty geometry: {path}")
-    allowed = {"LineString", "MultiLineString"}
-    unsupported = sorted(set(frame.geometry.geom_type) - allowed)
-    if unsupported:
-        raise ViewerError(
-            f"Viewer requires line segment geometry; found {', '.join(unsupported)} in {path}"
-        )
-
-
 def _latest_manifests(directory: Path) -> dict[str, dict[str, object]]:
     if not directory.is_dir():
         return {}
@@ -95,16 +80,80 @@ def _signature(path: Path) -> tuple[str, int, int, str]:
 
 @st.cache_data(show_spinner=False)
 def _load_segments_cached(
-    path_text: str,
-    signature: tuple[str, int, int, str],
-) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, str]:
-    del signature
-    path = Path(path_text)
-    analytical = gpd.read_parquet(path)
-    _validate_segments(analytical, path)
+    geometry_path_text: str,
+    geometry_signature: tuple[str, int, int, str],
+    attribute_path_text: str,
+    attribute_signature: tuple[str, int, int, str],
+    aoi_path_text: str | None,
+    aoi_signature: tuple[str, int, int, str] | None,
+    aoi_layer: str | None,
+) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, str, GeometryValidationResult]:
+    del geometry_signature, attribute_signature, aoi_signature
+    geometry_path = Path(geometry_path_text)
+    attribute_path = Path(attribute_path_text)
+    authoritative = gpd.read_parquet(geometry_path)
+    try:
+        attributes: pd.DataFrame = gpd.read_parquet(attribute_path)
+    except ValueError:
+        attributes = pd.read_parquet(attribute_path)
+    if "segment_id" not in attributes.columns:
+        raise ViewerError(f"Viewer attribute file has no segment_id column: {attribute_path}")
+    if attributes.empty:
+        raise ViewerError(f"Viewer attribute file contains no rows: {attribute_path}")
+    attribute_ids = attributes.segment_id.astype(str)
+    duplicates = attribute_ids[attribute_ids.duplicated()].unique()
+    if len(duplicates):
+        raise ViewerError(
+            "Viewer attribute file contains duplicate segment IDs: " + ", ".join(duplicates[:5])
+        )
+
+    if "segment_id" not in authoritative.columns:
+        raise ViewerError(
+            f"Authoritative coastline geometry has no segment_id column: {geometry_path}"
+        )
+    authoritative_ids = authoritative.segment_id.astype(str)
+    geometry_duplicates = authoritative_ids[authoritative_ids.duplicated()].unique()
+    if len(geometry_duplicates):
+        raise ViewerError(
+            "Authoritative coastline geometry contains duplicate segment IDs: "
+            + ", ".join(geometry_duplicates[:5])
+        )
+    geometry_set = set(authoritative_ids)
+    attribute_set = set(attribute_ids)
+    missing = sorted(geometry_set - attribute_set)
+    extra = sorted(attribute_set - geometry_set)
+    if missing or extra:
+        details = []
+        if missing:
+            details.append(f"missing attributes for {len(missing)} coastline segments")
+        if extra:
+            details.append(f"{len(extra)} attribute rows have no coastline segment")
+        raise ViewerError(
+            "Viewer geometry/attribute segment-ID mismatch: " + "; ".join(details) + "."
+        )
+
+    active_geometry = authoritative.geometry.name
+    geometry_table = authoritative[["segment_id", active_geometry]].copy()
+    geometry_table["segment_id"] = authoritative_ids
+    drop_columns = geometry_columns(attributes)
+    attribute_table = pd.DataFrame(attributes.drop(columns=drop_columns)).copy()
+    attribute_table["segment_id"] = attribute_ids
+    joined = geometry_table.merge(
+        attribute_table,
+        on="segment_id",
+        how="left",
+        sort=False,
+        validate="one_to_one",
+    )
+    analytical = gpd.GeoDataFrame(joined, geometry=active_geometry, crs=authoritative.crs)
+    aoi = load_aoi(Path(aoi_path_text), aoi_layer) if aoi_path_text else None
+    display, validation = validate_line_geometry(
+        analytical,
+        label=f"Authoritative viewer coastline {geometry_path}",
+        aoi=aoi,
+    )
     source_crs = analytical.crs.to_string()
-    display = analytical.to_crs(DISPLAY_CRS)
-    return analytical, display, source_crs
+    return analytical, display, source_crs, validation
 
 
 def load_viewer_data(region_id: str, root: Path | None = None) -> ViewerData:
@@ -118,11 +167,20 @@ def load_viewer_data(region_id: str, root: Path | None = None) -> ViewerData:
         mode = "terrain_only"
     else:
         raise ViewerError(missing_outputs_message(region_id))
-    signature = _signature(selected)
-    analytical, display, source_crs = _load_segments_cached(str(selected), signature)
+    if not paths.coast_segments.is_file():
+        raise ViewerError(
+            "Authoritative viewer coastline geometry is missing: "
+            f"{paths.coast_segments}. Re-run the Phase 1 build for {region_id}."
+        )
+    project_root = (root or viewer_project_root()).resolve()
+    geometry_signature = _signature(paths.coast_segments)
+    attribute_signature = _signature(selected)
     coastline_source_id: str | None = None
+    aoi_path: Path | None = None
+    aoi_layer: str | None = None
+    maximum_bathymetry_transect_length_m = 5_000.0
     try:
-        config, _ = load_region_config(region_id, (root or viewer_project_root()).resolve())
+        config, _ = load_region_config(region_id, project_root)
         coastline_source_id = (
             config.inputs.coastline.source_id
             if config.inputs.coastline is not None
@@ -130,8 +188,23 @@ def load_viewer_data(region_id: str, root: Path | None = None) -> ViewerData:
             if config.inputs.land_polygon is not None
             else None
         )
+        if config.area_of_interest is not None:
+            aoi_path = data_path(config.area_of_interest.path, project_root).resolve()
+            aoi_layer = config.area_of_interest.layer
+        if config.bathymetry is not None:
+            maximum_bathymetry_transect_length_m = config.bathymetry.maximum_offshore_distance_m
     except ConfigurationError:
         coastline_source_id = None
+    aoi_signature = _signature(aoi_path) if aoi_path is not None and aoi_path.is_file() else None
+    analytical, display, source_crs, validation = _load_segments_cached(
+        str(paths.coast_segments),
+        geometry_signature,
+        str(selected),
+        attribute_signature,
+        str(aoi_path) if aoi_path is not None else None,
+        aoi_signature,
+        aoi_layer,
+    )
     return ViewerData(
         region_id=region_id,
         mode=mode,
@@ -139,7 +212,13 @@ def load_viewer_data(region_id: str, root: Path | None = None) -> ViewerData:
         display_segments=display,
         paths=paths,
         source_crs=source_crs,
-        segment_checksum=signature[3],
+        segment_checksum=attribute_signature[3],
+        geometry_checksum=geometry_signature[3],
+        attribute_checksum=attribute_signature[3],
+        geometry_source=paths.coast_segments,
+        attribute_source=selected,
+        geometry_validation=validation,
+        maximum_bathymetry_transect_length_m=maximum_bathymetry_transect_length_m,
         coastline_source_id=coastline_source_id,
         manifests=_latest_manifests(paths.manifest_directory),
     )
@@ -153,13 +232,11 @@ def _load_transects_cached(
     del signature
     path = Path(path_text)
     frame = gpd.read_parquet(path)
-    if frame.crs is None:
-        raise ViewerError(f"Bathymetry transect file has no CRS metadata: {path}")
     required = {"bathymetry_transect_id", "segment_id", "geometry"}
     missing = sorted(required - set(frame.columns))
     if missing:
         raise ViewerError(f"Bathymetry transects are missing: {', '.join(missing)}")
-    return frame.to_crs(DISPLAY_CRS)
+    return frame
 
 
 def load_display_transects(
@@ -180,15 +257,15 @@ def load_display_transects(
             data.display_segments.get("orientation_status", "") == "ambiguous", "segment_id"
         ].astype(str)
     )
-    contaminated = ambiguous & set(frame.segment_id.astype(str))
-    if contaminated:
-        raise ViewerError(
-            "Bathymetry transects unexpectedly reference ambiguous segments: "
-            + ", ".join(sorted(contaminated)[:5])
-        )
+    display, _ = validate_transect_geometry(
+        frame,
+        data.analytical_segments,
+        ambiguous_segment_ids=ambiguous,
+        maximum_length_m=data.maximum_bathymetry_transect_length_m,
+    )
     if segment_ids is not None:
-        frame = frame[frame.segment_id.astype(str).isin(segment_ids)]
-    return frame.copy()
+        display = display[display.segment_id.astype(str).isin(segment_ids)]
+    return display.copy()
 
 
 def cache_fingerprint(data: ViewerData) -> dict[str, Any]:
@@ -199,4 +276,9 @@ def cache_fingerprint(data: ViewerData) -> dict[str, Any]:
         "source_crs": data.source_crs,
         "display_crs": DISPLAY_CRS,
         "segment_checksum": data.segment_checksum,
+        "geometry_source": str(data.geometry_source),
+        "attribute_source": str(data.attribute_source),
+        "geometry_checksum": data.geometry_checksum,
+        "attribute_checksum": data.attribute_checksum,
+        "geometry_validation": data.geometry_validation.as_dict(),
     }

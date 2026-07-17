@@ -6,6 +6,8 @@ from typing import Literal
 
 import geopandas as gpd
 
+from coastscan.viewer.validation import GeometryValidationResult
+
 MetricKind = Literal["continuous", "categorical", "boolean"]
 MetricCategory = Literal["terrain", "bathymetry", "quality"]
 ScaleType = Literal["sequential", "diverging", "categorical"]
@@ -48,6 +50,12 @@ class ViewerData:
     paths: ViewerPaths
     source_crs: str
     segment_checksum: str
+    geometry_checksum: str
+    attribute_checksum: str
+    geometry_source: Path
+    attribute_source: Path
+    geometry_validation: GeometryValidationResult
+    maximum_bathymetry_transect_length_m: float = 5_000.0
     coastline_source_id: str | None = None
     manifests: dict[str, dict[str, object]] = field(default_factory=dict)
 

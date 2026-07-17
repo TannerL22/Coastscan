@@ -26,10 +26,11 @@ marine cell and calculates target-distance depths, regional gradients, contour-d
 source/quality summaries and transparent usability classes. It never overwrites Phase 1
 `segment_features.parquet`.
 
-Phase 2.5 adds a local Streamlit and PyDeck exploration viewer. It reads the existing GeoParquet
-tables, makes an in-memory EPSG:4326 display copy, and provides transparent terrain, regional
-bathymetry and data-quality controls. It does not calculate new analytical features or any combined
-score.
+Phase 2.5 adds a local Streamlit and PyDeck exploration viewer. Authoritative display geometry comes
+from `coast_segments.parquet`; terrain or Phase 2 attributes are joined one-to-one by `segment_id`, and
+a separately validated in-memory EPSG:4326 copy becomes independent PyDeck line paths. The viewer
+provides transparent terrain, regional bathymetry and data-quality controls without calculating new
+analytical features or any combined score.
 
 The bathymetry hierarchy is: public authoritative high-resolution data where it genuinely overlaps;
 the latest stable EMODnet regional DTM as the mandatory baseline; lower-quality fallback cells retained
@@ -85,17 +86,18 @@ uv run coastscan build-bathymetry --region mallorca_northwest_pilot --force --wr
 uv run coastscan build-bathymetry --region mallorca_northwest_pilot --write-samples
 
 # Local Phase 2.5 viewer
+uv run coastscan inspect-viewer-geometry --region mallorca_northwest_pilot
 uv run coastscan view-map --region mallorca_northwest_pilot
 ```
 
 Both build commands accept `--skip-qa-map` and `--verbose`. `--force` rebuilds only that stage's cache.
 Changing bathymetry never requires rerunning the 2 m terrain stage.
 
-The viewer opens at `http://localhost:8501` by default. It prefers
-`segment_features_phase2.parquet` and lazily loads `bathymetry_transects.parquet` only when the
-transect layer is enabled. If Phase 2 is absent, `segment_features.parquet` enables a clearly labelled
-terrain-only mode and bathymetry controls are disabled. Missing Phase 1 and Phase 2 outputs produce the
-exact acquisition/build commands needed to create them.
+The viewer opens at `http://localhost:8501` by default. It always uses
+`coast_segments.parquet` as geometry authority, prefers `segment_features_phase2.parquet` for
+attributes and lazily loads validated `bathymetry_transects.parquet` only when that layer is enabled.
+If Phase 2 is absent, `segment_features.parquet` enables a clearly labelled terrain-only mode and
+bathymetry controls are disabled. Missing or spatially invalid inputs stop with actionable errors.
 
 The default CARTO Light/Dark basemaps require no account, API key or secret. A satellite option appears
 only when a local `MAPBOX_API_KEY` is supplied; `.env.example` documents the optional variable and
@@ -135,8 +137,10 @@ uv run mypy src
 The synthetic suite covers coastline geometries and terrestrial rasters plus canonical bathymetry sign
 conversion, zero/nodata behavior, resolution classes, separate transects, known gradients/contours,
 provider methods, atomic download/reuse, Phase 2 manifests, cache reuse and stale-upstream rejection.
-Viewer tests cover immutable loading/reprojection, metric metadata, filters, colour scales, PyDeck
-layers, deterministic interpretation, terrain-only operation, missing files and Streamlit smoke tests.
+Viewer tests cover authoritative geometry/attribute joins, CRS and AOI validation, immutable
+reprojection, independent LineString/MultiLineString path conversion, fit-bounds behavior, transects,
+flag overlays, metric metadata, filters, colour scales, selection, terrain-only operation, invalid or
+missing files and Streamlit smoke tests.
 
 ## Real-data limitations
 
