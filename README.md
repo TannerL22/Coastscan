@@ -103,6 +103,10 @@ The default CARTO Light/Dark basemaps require no account, API key or secret. A s
 only when a local `MAPBOX_API_KEY` is supplied; `.env.example` documents the optional variable and
 secrets are Git-ignored. See `docs/local_viewer.md` for architecture, filters, testing and limitations.
 
+The public hosted viewer is available at <https://coastscan.streamlit.app/>. Its repository snapshot
+contains only the small checksum-verified derived Mallorca viewer tables and generated AOI required at
+runtime; the official raw source datasets remain excluded.
+
 For the explicit synthetic demo:
 
 ```bash
@@ -121,9 +125,11 @@ uv run coastscan build-region --region synthetic_demo --force --write-samples
 - `outputs/manifests/<region>/`: separate timestamped Phase 1 and Phase 2 manifests.
 - `outputs/qa/<region>/`: machine-readable QA and static maps/cross-sections.
 
-Raw, interim, processed and run-output data are Git-ignored. The public repository stores acquisition
+Raw sources, interim products and run outputs are Git-ignored. The public repository stores acquisition
 plans, expected checksums, code, synthetic fixtures and documentation needed to reproduce official-data
-outputs without fabricating or redistributing Mallorca source data.
+outputs without fabricating or redistributing Mallorca source data. A narrow exception tracks the
+small checksum-verified derived Mallorca viewer snapshot and generated AOI so the public Streamlit app
+can run without rebuilding or downloading the large official inputs.
 
 ## Development and tests
 

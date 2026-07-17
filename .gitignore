@@ -15,8 +15,13 @@ data/interim/**
 data/processed/**
 outputs/**
 !data/raw/.gitkeep
+!data/raw/boundaries/
+data/raw/boundaries/**
+!data/raw/boundaries/mallorca_northwest_aoi.gpkg
 !data/interim/.gitkeep
 !data/processed/.gitkeep
+!data/processed/mallorca_northwest_pilot/
+!data/processed/mallorca_northwest_pilot/*.parquet
 !outputs/manifests/.gitkeep
 !outputs/qa/.gitkeep
 !outputs/reports/.gitkeep
