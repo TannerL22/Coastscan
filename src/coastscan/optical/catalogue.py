@@ -54,12 +54,14 @@ def catalogue_query(config: Any, root: Path) -> tuple[str, str, gpd.GeoDataFrame
         raise ConfigurationError(f"Optical inputs are not configured for {config.region_id}")
     aoi = _aoi(config, root)
     bbox = ",".join(f"{value:.8f}" for value in aoi.total_bounds)
+    query_end = settings.historical_end
+    if settings.include_partial_current_year:
+        query_end = max(query_end, datetime.now(UTC).date())
     parameters = {
         "collections": source.collection,
         "bbox": bbox,
         "datetime": (
-            f"{settings.historical_start.isoformat()}T00:00:00Z/"
-            f"{settings.historical_end.isoformat()}T23:59:59Z"
+            f"{settings.historical_start.isoformat()}T00:00:00Z/{query_end.isoformat()}T23:59:59Z"
         ),
         "limit": "100",
     }
@@ -69,6 +71,8 @@ def catalogue_query(config: Any, root: Path) -> tuple[str, str, gpd.GeoDataFrame
             {
                 "url": url,
                 "months": settings.months,
+                "include_partial_current_year": settings.include_partial_current_year,
+                "partial_query_end": query_end.isoformat(),
                 "cloud": settings.catalogue.maximum_catalogue_cloud_cover_percent,
                 "assets": required_asset_map(source.required_assets),
             },
@@ -113,10 +117,18 @@ def _rows(
         available = all(key in assets and assets[key].get("href") for key in mapping.values())
         cloud = float(properties.get("eo:cloud_cover", 100.0))
         in_month = int(timestamp.month) in settings.months
+        analysis_period = (
+            "partial_current_year"
+            if timestamp.date() > settings.historical_end
+            else "historical_baseline"
+        )
+        allowed_period = (
+            analysis_period == "historical_baseline" or settings.include_partial_current_year
+        )
         under_cloud = cloud <= settings.catalogue.maximum_catalogue_cloud_cover_percent
         reason = (
             "candidate"
-            if available and in_month and under_cloud and coverage > 0
+            if available and in_month and under_cloud and coverage > 0 and allowed_period
             else "missing_required_asset"
             if not available
             else "outside_configured_months"
@@ -124,6 +136,8 @@ def _rows(
             else "catalogue_cloud_cover_above_limit"
             if not under_cloud
             else "no_aoi_overlap"
+            if coverage <= 0
+            else "partial_current_year_disabled"
         )
         record: dict[str, object] = {
             "scene_id": str(item["id"]),
@@ -133,6 +147,10 @@ def _rows(
             "acquisition_date": timestamp.date().isoformat(),
             "year": int(timestamp.year),
             "month": int(timestamp.month),
+            "analysis_period": analysis_period,
+            "partial_period_label": (
+                settings.partial_year_label if analysis_period == "partial_current_year" else None
+            ),
             "tile_id": str(properties.get("grid:code", "")).removeprefix("MGRS-"),
             "processing_baseline": str(properties.get("processing:version", "unknown")),
             "product_uri": str(assets.get("Product", {}).get("href", "")),
@@ -151,6 +169,17 @@ def _rows(
             "required_assets_available": available,
             "estimated_source_bytes": int(
                 sum(int(assets.get(key, {}).get("file:size", 0) or 0) for key in mapping.values())
+            ),
+            "estimated_clipped_pixels": int(
+                sum(
+                    int(asset.get("proj:shape", [0, 0])[0] or 0)
+                    * int(asset.get("proj:shape", [0, 0])[1] or 0)
+                    * scene_area_share
+                    for key in mapping.values()
+                    for asset in [assets.get(key, {})]
+                    if isinstance(asset.get("proj:shape"), list)
+                    and len(asset.get("proj:shape", [])) == 2
+                )
             ),
             "selected": reason == "candidate",
             "selection_reason": reason,
@@ -272,10 +301,25 @@ def inspect_optical(
 ) -> dict[str, object]:
     frame, metadata = discover_scene_catalogue(region, root=root, refresh=refresh, getter=getter)
     selected = frame[frame.selected] if not frame.empty else frame
-    required_columns = [column for column in frame.columns if column.startswith("asset_")]
+    required_columns = [f"asset_{role}" for role in ("blue", "green", "red", "nir", "swir1", "scl")]
     asset_availability = {
         column: int(frame[column].astype(str).ne("").sum()) for column in required_columns
     }
+    config, _ = load_region_config(region, root)
+    source = config.inputs.optical
+    settings = config.optical
+    acquisition_manifest = (
+        root / "data" / "interim" / config.region_id / "optical" / "acquisition_manifest.json"
+    )
+    existing_cache_bytes = 0
+    existing_clip_count = 0
+    if acquisition_manifest.is_file():
+        try:
+            acquisition = json.loads(acquisition_manifest.read_text(encoding="utf-8"))
+            existing_cache_bytes = int(acquisition.get("actual_cache_bytes", 0))
+            existing_clip_count = len(acquisition.get("files", []))
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            pass
     return {
         **metadata,
         "authentication": authentication_status(),
@@ -310,6 +354,15 @@ def inspect_optical(
         )
         if len(selected)
         else 0,
+        "estimated_aoi_clipped_pixels": int(selected.estimated_clipped_pixels.sum())
+        if len(selected)
+        else 0,
+        "required_bands": required_asset_map(source.required_assets) if source else {},
+        "configured_cache_limit_bytes": (
+            int(settings.maximum_optical_cache_gb * 1024**3) if settings else None
+        ),
+        "existing_cache_bytes": existing_cache_bytes,
+        "existing_clip_count": existing_clip_count,
         "duplicate_or_overlap_rejections": int(
             frame.selection_reason.astype(str).str.startswith("duplicate").sum()
         )

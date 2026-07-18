@@ -12,7 +12,9 @@ underwater clearance, submerged obstacles, suitability or safety.
    selection/rejection reasons, checksums, AOI coverage and estimated bytes.
 2. `acquire-optical` requires runtime-only CDSE S3 access/secret credentials. It clips only the six
    required official JP2 assets to the AOI, writes atomic local GeoTIFF cache entries and records
-   hashes without recording credentials. A configurable cache ceiling is enforced.
+   hashes without recording credentials. A configurable cache ceiling is enforced. A separate
+   acquisition manifest covers every selected scene and all six assets; reuse verifies source href,
+   byte size and SHA-256 rather than trusting filename presence.
 3. `build-clarity` verifies the five protected Phase 1/2 files before and after its run. It creates
    deterministic segment-owned nearshore (20–100 m), coastal (100–300 m) and context (300–750 m)
    zones from authoritative seaward orientation. Ambiguous orientations have no optical zone.
@@ -27,13 +29,22 @@ underwater clearance, submerged obstacles, suitability or safety.
 7. Monthly and configured seasonal periods aggregate valid scene counts, year/month coverage,
    median and p90 relative clarity, clear/turbid-looking shares, persistence and variability.
    Confidence is calculated separately from clarity.
-8. Apparent bottom texture is separately gated by valid clear-looking observations, foam/glint
-   exclusions, regional texture strength and cross-scene persistence. Unstable or sparse evidence is
-   reported as `unstable` or `insufficient`, not as physical bottom visibility.
+8. Apparent bottom-texture candidates are separately gated by valid clear-looking observations,
+   foam/glint exclusions and regional texture strength. The current implementation deliberately
+   publishes persistence and bottom-visibility proxy fields as insufficient unless spatial
+   cross-scene repeatability has actually been verified; scene-candidate frequency alone is not
+   treated as repeatability or physical bottom visibility.
 
-The cache key includes the configuration, official catalogue, algorithm version and all five protected
-Phase 1/2 checksums. A changed scene selection, asset metadata, configuration, zone contract or
-upstream file therefore invalidates reuse.
+The cache key includes the configuration, official catalogue, acquisition-manifest checksum,
+algorithm version and all five protected Phase 1/2 checksums. Cached reuse also verifies the checksums
+of every declared Phase 3 output. A changed scene selection, asset metadata, clipped image,
+configuration, zone contract, output or upstream file therefore invalidates reuse.
+
+The build writes `clarity_zones.parquet`, `clarity_scenes.parquet`, seasonal and headline clarity
+tables, the additive Phase 3 join, detailed QA JSON and static derived-only QA figures. A timestamped
+`*_clarity.json` manifest and `latest_clarity.json` record exact upstream, catalogue, acquisition,
+method, output and software provenance. Optional current-year scenes are written to a distinctly
+labelled table and never enter the 2021-2025 historical baseline.
 
 ## Commands and one-time account action
 

@@ -134,9 +134,12 @@ uv run coastscan build-region --region synthetic_demo --force --write-samples
 - `data/processed/<region>/bathymetry_features.parquet`: regional bathymetry proxies.
 - `data/processed/<region>/segment_features_phase2.parquet`: descriptive Phase 1/2 join.
 - `data_catalog/optical/<region>_scenes.parquet`: stable official scene IDs and selection audit.
-- `data/processed/<region>/optical_zones.parquet`: segment-owned nearshore/context zones.
+- `data/processed/<region>/clarity_zones.parquet`: segment-owned nearshore/coastal/context zones.
+- `data/processed/<region>/clarity_scenes.parquet`: one-row-per-scene selection and quality audit.
 - `data/processed/<region>/clarity_features.parquet`: one historical optical row per segment.
 - `data/processed/<region>/clarity_seasonal_features.parquet`: period and zone optical summaries.
+- `data/processed/<region>/clarity_current_period_features.parquet`: optional separately labelled
+  partial-current-year summaries; never mixed into the historical baseline.
 - `data/processed/<region>/segment_features_phase3.parquet`: additive Phase 1/2/3 viewer join.
 - `outputs/manifests/<region>/`: separate Phase 1, Phase 2 and Phase 3 manifests.
 - `outputs/qa/<region>/`: machine-readable QA and static maps/cross-sections.
@@ -160,7 +163,8 @@ The synthetic suite covers coastline geometries and terrestrial rasters plus can
 conversion, zero/nodata behavior, resolution classes, separate transects, known gradients/contours,
 provider methods, atomic download/reuse, Phase 2 manifests, cache reuse and stale-upstream rejection.
 Optical tests cover catalogue selection, processing-baseline preference, radiometry, resampling,
-seaward zones, exclusions, relative components, aggregation, confidence and texture repeatability.
+seaward zones, exclusions, relative components, aggregation, confidence, conservative texture gating,
+cache integrity, exact output schemas, QA artifacts and a deterministic synthetic Phase 3 build.
 Viewer tests cover authoritative geometry/attribute joins, CRS and AOI validation, immutable
 reprojection, independent LineString/MultiLineString path conversion, fit-bounds behavior, transects,
 flag overlays, metric metadata, filters, colour scales, selection, terrain-only operation, invalid or

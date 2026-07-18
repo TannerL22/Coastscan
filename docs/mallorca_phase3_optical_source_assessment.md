@@ -31,7 +31,9 @@ configured months and 27 above the initial cloud ceiling). Selected coverage run
 2025-09-30. Processing baselines are 05.00 (22), 05.10 (67) and 05.11 (53); every returned item has
 all six required analytical assets. Full selected assets total an estimated 63,524,349,218 bytes,
 while AOI-area-proportional clipped storage is approximately 640,738,856 bytes. The catalogue SHA-256
-is `3a6d0bced8ab853be6f60249a62ce349ec888678c57e5303240604123618967e`.
+is `47d7d44a4c06784032be00436428eadbacc7109d02db84b82d7f2ad568c81432`. The
+asset-shape/overlap audit estimates 781,288,859 clipped source pixels across the six assets before
+GeoTIFF compression.
 
 | Role | STAC asset | Native sampling | Handling |
 |---|---|---:|---|

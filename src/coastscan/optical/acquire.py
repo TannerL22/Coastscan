@@ -12,6 +12,7 @@ from coastscan.catalog.manifests import sha256_file
 from coastscan.config import PROJECT_ROOT, load_region_config
 from coastscan.exceptions import AcquisitionError
 from coastscan.optical.authentication import require_s3_credentials
+from coastscan.optical.cache import CLIP_ROLES, acquisition_manifest_path, clip_path
 from coastscan.optical.catalogue import discover_scene_catalogue
 
 
@@ -73,21 +74,39 @@ def acquire_optical(
     aoi_path = root / config.area_of_interest.path
     aoi = gpd.read_file(aoi_path, layer=config.area_of_interest.layer)
     cache = root / "data" / "interim" / config.region_id / "optical" / "clips"
+    manifest_path = acquisition_manifest_path(root, config.region_id)
+    previous_files: dict[tuple[str, str], dict[str, object]] = {}
+    if manifest_path.is_file():
+        try:
+            previous = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            previous = {}
+        if previous.get("catalogue_checksum") == metadata.get("catalogue_checksum"):
+            previous_files = {
+                (str(item.get("scene_id")), str(item.get("asset_role"))): item
+                for item in previous.get("files", [])
+                if isinstance(item, dict)
+            }
     files: list[dict[str, object]] = []
-    asset_columns = [
-        str(name)
-        for name in selected
-        if str(name).startswith("asset_") and str(name) != "asset_checksums_or_etags"
-    ]
+    asset_columns = [f"asset_{role}" for role in CLIP_ROLES]
     for row in selected.itertuples():
         for column in asset_columns:
             href = str(getattr(row, column))
             role = column.removeprefix("asset_")
-            destination = cache / str(row.scene_id) / f"{role}.tif"
-            if not destination.is_file():
+            destination = clip_path(root, config.region_id, str(row.scene_id), role)
+            previous = previous_files.get((str(row.scene_id), role), {})
+            cached_valid = (
+                destination.is_file()
+                and previous.get("source_href") == href
+                and previous.get("bytes") == destination.stat().st_size
+                and previous.get("sha256") == sha256_file(destination)
+            )
+            if not cached_valid:
                 _atomic_clip(
                     href, destination, aoi, credentials.rasterio_options(source.s3_endpoint)
                 )
+            metadata_role = "scene_classification" if role == "scl" else role
+            source_metadata = json.loads(str(row.asset_checksums_or_etags)).get(metadata_role, {})
             files.append(
                 {
                     "scene_id": str(row.scene_id),
@@ -95,6 +114,9 @@ def acquire_optical(
                     "path": destination.relative_to(root).as_posix(),
                     "bytes": destination.stat().st_size,
                     "sha256": sha256_file(destination),
+                    "source_href": href,
+                    "source_asset_checksum": source_metadata.get("file_checksum"),
+                    "source_asset_size": source_metadata.get("file_size"),
                 }
             )
             actual_bytes = sum(path.stat().st_size for path in cache.glob("*/*.tif"))
@@ -107,6 +129,7 @@ def acquire_optical(
         "region_id": config.region_id,
         "provider": "Copernicus Data Space Ecosystem",
         "catalogue_checksum": metadata.get("catalogue_checksum"),
+        "query_fingerprint": metadata.get("query_fingerprint"),
         "scene_count": len(selected),
         "files": files,
         "actual_cache_bytes": sum(
@@ -116,6 +139,8 @@ def acquire_optical(
         "configured_cache_limit_bytes": cache_limit,
         "secrets_recorded": False,
     }
-    path = cache.parent / "acquisition_manifest.json"
-    path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_manifest = manifest_path.with_suffix(".part.json")
+    temporary_manifest.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+    os.replace(temporary_manifest, manifest_path)
     return manifest

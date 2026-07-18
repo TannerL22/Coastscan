@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Any
 
 import geopandas as gpd
-from shapely.geometry import LineString, MultiLineString, Point
+from shapely import make_valid
+from shapely.geometry import LineString, MultiLineString, MultiPolygon, Point, Polygon
 from shapely.ops import unary_union
 
 from coastscan.config import data_path
@@ -31,10 +32,34 @@ def _offset(point: Point, bearing_degrees: float, distance: float) -> Point:
     return Point(point.x + math.sin(angle) * distance, point.y + math.cos(angle) * distance)
 
 
+def _clean_polygonal(geometry: Any, minimum_area: float) -> tuple[Any, list[str]]:
+    warnings: list[str] = []
+    if not geometry.is_valid:
+        geometry = make_valid(geometry)
+        warnings.append("geometry_repaired")
+    raw_parts = list(geometry.geoms) if hasattr(geometry, "geoms") else [geometry]
+    parts: list[Polygon] = []
+    removed = 0
+    for part in raw_parts:
+        candidates = list(part.geoms) if isinstance(part, MultiPolygon) else [part]
+        for candidate in candidates:
+            if isinstance(candidate, Polygon) and candidate.area >= minimum_area:
+                parts.append(candidate)
+            elif getattr(candidate, "area", 0.0) > 0:
+                removed += 1
+    if removed:
+        warnings.append(f"tiny_slivers_removed:{removed}")
+    if len(parts) > 1:
+        warnings.append(f"disconnected_valid_parts:{len(parts)}")
+    return unary_union(parts), warnings
+
+
 def generate_optical_zones(
     segments: gpd.GeoDataFrame,
     land_geometry: Any,
     zone_config: Any,
+    *,
+    land_exclusion_m: float = 0.0,
 ) -> gpd.GeoDataFrame:
     if segments.crs is None:
         raise ValueError("Optical zone segments require a projected CRS")
@@ -50,13 +75,21 @@ def generate_optical_zones(
         orientation = str(getattr(row, "orientation_status", "ambiguous"))
         bearing = getattr(row, "seaward_bearing_deg", None)
         if orientation == "ambiguous" or bearing is None or not math.isfinite(float(bearing)):
-            for zone_type in ZONE_RANGES:
+            for zone_type, (inner, outer) in ranges.items():
                 records.append(
                     {
                         "zone_id": f"{segment_id}:{zone_type}",
                         "segment_id": segment_id,
                         "zone_type": zone_type,
+                        "zone_class": zone_type,
+                        "inner_distance_m": float(inner),
+                        "outer_distance_m": float(outer),
+                        "zone_area_m2": 0.0,
+                        "orientation_status": orientation,
                         "zone_status": "ambiguous_orientation",
+                        "zone_geometry_status": "ambiguous_orientation",
+                        "land_exclusion_m": land_exclusion_m,
+                        "geometry_warnings": "orientation_unresolved",
                         "geometry": None,
                     }
                 )
@@ -69,7 +102,10 @@ def generate_optical_zones(
                 ).buffer(spacing / 2, cap_style="flat")
                 for origin in origins
             ]
-            geometry = unary_union(strips).difference(land_geometry)
+            geometry, warnings = _clean_polygonal(
+                unary_union(strips).difference(land_geometry),
+                minimum_area=max(1.0, spacing * spacing * 0.02),
+            )
             status = (
                 "valid"
                 if not geometry.is_empty and geometry.area > 0
@@ -80,7 +116,15 @@ def generate_optical_zones(
                     "zone_id": f"{segment_id}:{zone_type}",
                     "segment_id": segment_id,
                     "zone_type": zone_type,
+                    "zone_class": zone_type,
+                    "inner_distance_m": float(inner),
+                    "outer_distance_m": float(outer),
+                    "zone_area_m2": float(geometry.area) if status == "valid" else 0.0,
+                    "orientation_status": orientation,
                     "zone_status": status,
+                    "zone_geometry_status": status,
+                    "land_exclusion_m": land_exclusion_m,
+                    "geometry_warnings": ";".join(warnings),
                     "geometry": geometry if status == "valid" else None,
                 }
             )
@@ -98,4 +142,9 @@ def zones_for_region(config: Any, segments: gpd.GeoDataFrame, root: Path) -> gpd
         config.analysis_crs,
         selection_filters=source.selection_filters,
     ).geometry.buffer(settings.masks.minimum_land_exclusion_m)
-    return generate_optical_zones(segments.to_crs(config.analysis_crs), land, settings.zones)
+    return generate_optical_zones(
+        segments.to_crs(config.analysis_crs),
+        land,
+        settings.zones,
+        land_exclusion_m=settings.masks.minimum_land_exclusion_m,
+    )

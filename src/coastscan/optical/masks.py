@@ -13,6 +13,7 @@ SCL_LAND_OR_INVALID = frozenset({0, 1, 4, 5, 11})
 
 @dataclass(frozen=True)
 class OpticalMasks:
+    spectral_water: NDArray[np.bool_]
     cloud: NDArray[np.bool_]
     shadow: NDArray[np.bool_]
     cirrus: NDArray[np.bool_]
@@ -27,6 +28,7 @@ class OpticalMasks:
         selected = np.ones(self.valid_water.shape, dtype=bool) if zone is None else zone
         denominator = int(selected.sum())
         names = (
+            "spectral_water",
             "cloud",
             "shadow",
             "cirrus",
@@ -81,7 +83,16 @@ def build_masks(
     )
     valid_water = water_like & ~excluded
     return OpticalMasks(
-        cloud, shadow, cirrus, land, dark_shadow, whitewater, glint_risk, invalid_input, valid_water
+        water_like,
+        cloud,
+        shadow,
+        cirrus,
+        land,
+        dark_shadow,
+        whitewater,
+        glint_risk,
+        invalid_input,
+        valid_water,
     )
 
 

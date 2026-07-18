@@ -1,15 +1,15 @@
 {
   "candidate_items_returned": 394,
-  "catalogue_checksum": "3a6d0bced8ab853be6f60249a62ce349ec888678c57e5303240604123618967e",
+  "catalogue_checksum": "47d7d44a4c06784032be00436428eadbacc7109d02db84b82d7f2ad568c81432",
   "catalogue_endpoint": "https://stac.dataspace.copernicus.eu/v1",
   "catalogue_reused": false,
-  "catalogue_search_seconds": 26.201683899998898,
+  "catalogue_search_seconds": 19.147502400010126,
   "collection": "sentinel-2-l2a",
   "configuration_checksum": "69fecbfaf146f961fb9bc49a7a2118a0f40262750ab53820484c393a82c9603e",
   "configuration_path": "config/regions/mallorca_northwest_pilot.yml",
   "provider": "Copernicus Data Space Ecosystem",
-  "query_fingerprint": "514aba3a9c1b96c56678aac3b44f3c06eb2c349f3531d8519f10f49f41fb0fba",
+  "query_fingerprint": "4abee2f68e81d4610adc36db1e16ab6e9b5a8e1376df90fd48f2daf062a47142",
   "region_id": "mallorca_northwest_pilot",
-  "retrieved_at_utc": "2026-07-18T15:38:27.573879+00:00",
+  "retrieved_at_utc": "2026-07-18T16:19:41.694182+00:00",
   "selected_items": 142
 }

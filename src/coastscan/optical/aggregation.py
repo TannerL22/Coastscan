@@ -40,6 +40,14 @@ def aggregate_periods(
         ):
             valid = group.loc[group.valid.astype(bool) & group.clarity_percentile.notna()]
             values = pd.to_numeric(valid.clarity_percentile, errors="coerce").dropna()
+            monthly_medians = (
+                valid.assign(
+                    clarity_numeric=pd.to_numeric(valid.clarity_percentile, errors="coerce")
+                )
+                .groupby(["year", "month"], sort=True)
+                .clarity_numeric.median()
+                .dropna()
+            )
             mask_columns = [
                 str(name) for name in group.columns if str(name).endswith("_excluded_share")
             ]
@@ -61,17 +69,23 @@ def aggregate_periods(
             record: dict[str, object] = {
                 "segment_id": str(segment_id),
                 "zone_type": str(zone_type),
+                "zone_class": str(zone_type),
                 "period_id": period_id,
+                "period_label": period_id.replace("_", " ").title(),
                 "configured_months": ",".join(map(str, months)),
                 "candidate_observation_count": len(group),
                 "valid_scene_count": int(valid.scene_id.nunique()),
                 "valid_year_count": int(valid.year.nunique()),
                 "valid_month_count": int(valid.month.nunique()),
                 "valid_observation_share": valid_share,
+                "clarity_percentile_p10": float(values.quantile(0.1)) if len(values) else np.nan,
                 "clarity_percentile_p50": float(values.quantile(0.5)) if len(values) else np.nan,
                 "clarity_percentile_p90": float(values.quantile(0.9)) if len(values) else np.nan,
                 "clarity_variability_iqr": (
                     float(values.quantile(0.75) - values.quantile(0.25)) if len(values) else np.nan
+                ),
+                "clarity_variability_mad": (
+                    float((values - values.median()).abs().median()) if len(values) else np.nan
                 ),
                 "clear_water_observation_share": (
                     float((values >= clear_threshold).mean()) if len(values) else np.nan
@@ -80,16 +94,18 @@ def aggregate_periods(
                     float((values <= turbid_threshold).mean()) if len(values) else np.nan
                 ),
                 "clarity_persistence": (
-                    float((values >= clear_threshold).mean()) if len(values) else np.nan
+                    float((monthly_medians >= clear_threshold).mean())
+                    if len(monthly_medians)
+                    else np.nan
                 ),
                 "mean_mask_burden": burden,
                 "clarity_data_confidence": confidence.confidence,
                 "clarity_quality_flag": confidence.quality_flag,
                 "clarity_limitation_reasons": ";".join(confidence.reasons),
             }
-            if "apparent_bottom_texture_candidate" in valid:
+            if "apparent_bottom_texture_repeatable" in valid:
                 texture_share = float(
-                    valid.apparent_bottom_texture_candidate.fillna(False).astype(bool).mean()
+                    valid.apparent_bottom_texture_repeatable.fillna(False).astype(bool).mean()
                 )
                 texture_scenes = int(valid.scene_id.nunique())
                 texture_status = (
@@ -101,6 +117,7 @@ def aggregate_periods(
                     else "insufficient"
                 )
                 record.update(
+                    apparent_bottom_texture_scene_share=texture_share,
                     bottom_visibility_proxy_share=(
                         texture_share if texture_status == "repeatable" else np.nan
                     ),
@@ -111,12 +128,33 @@ def aggregate_periods(
                 )
             else:
                 record.update(
+                    apparent_bottom_texture_scene_share=(
+                        float(
+                            valid.apparent_bottom_texture_candidate.fillna(False)
+                            .astype(bool)
+                            .mean()
+                        )
+                        if "apparent_bottom_texture_candidate" in valid
+                        else np.nan
+                    ),
                     bottom_visibility_proxy_share=np.nan,
                     apparent_bottom_texture_persistence=np.nan,
-                    bottom_texture_status="insufficient",
+                    bottom_texture_status="insufficient_repeatability_not_verified",
                 )
             for name in mask_columns:
                 record[name] = float(pd.to_numeric(group[name], errors="coerce").mean())
+            for output, source in (
+                ("cloud_exclusion_p50", "cloud_excluded_share"),
+                ("shadow_exclusion_p50", "shadow_excluded_share"),
+                ("glint_exclusion_p50", "glint_excluded_share"),
+                ("land_exclusion_p50", "land_excluded_share"),
+                ("whitewater_exclusion_p50", "whitewater_excluded_share"),
+            ):
+                record[output] = (
+                    float(pd.to_numeric(group[source], errors="coerce").median())
+                    if source in group
+                    else np.nan
+                )
             records.append(record)
     return (
         pd.DataFrame.from_records(records)
@@ -136,9 +174,25 @@ def headline_features(
     ].copy()
     if chosen.segment_id.duplicated().any():
         raise ValueError("Headline optical features are not one-to-one by segment_id")
-    return chosen.drop(columns=["zone_type", "period_id", "configured_months"]).reset_index(
-        drop=True
-    )
+    chosen = chosen.drop(
+        columns=["zone_type", "zone_class", "period_id", "period_label", "configured_months"]
+    ).reset_index(drop=True)
+    summer = seasonal.loc[
+        (seasonal.period_id == "summer_jja") & (seasonal.zone_type == headline_zone),
+        ["segment_id", "clarity_percentile_p50"],
+    ].rename(columns={"clarity_percentile_p50": "clarity_summer_percentile"})
+    chosen = chosen.merge(summer, on="segment_id", how="left", validate="one_to_one")
+    aliases = {
+        "clarity_valid_scene_count": "valid_scene_count",
+        "clarity_valid_year_count": "valid_year_count",
+        "clarity_valid_month_count": "valid_month_count",
+        "clarity_median_percentile": "clarity_percentile_p50",
+        "clarity_p90_percentile": "clarity_percentile_p90",
+        "clarity_primary_limitations": "clarity_limitation_reasons",
+    }
+    for alias, source in aliases.items():
+        chosen[alias] = chosen[source]
+    return chosen
 
 
 def best_month(seasonal: pd.DataFrame) -> pd.DataFrame:
@@ -148,7 +202,13 @@ def best_month(seasonal: pd.DataFrame) -> pd.DataFrame:
         usable = group.dropna(subset=["clarity_percentile_p50"])
         if usable.empty:
             records.append(
-                {"segment_id": segment_id, "best_month": None, "most_reliable_month": None}
+                {
+                    "segment_id": segment_id,
+                    "best_month": None,
+                    "most_reliable_month": None,
+                    "clarity_best_month": None,
+                    "clarity_most_reliable_month": None,
+                }
             )
             continue
         best = usable.sort_values(
@@ -162,6 +222,8 @@ def best_month(seasonal: pd.DataFrame) -> pd.DataFrame:
                 "segment_id": segment_id,
                 "best_month": str(best.period_id),
                 "most_reliable_month": str(reliable.period_id),
+                "clarity_best_month": str(best.period_id),
+                "clarity_most_reliable_month": str(reliable.period_id),
             }
         )
     return pd.DataFrame.from_records(records)

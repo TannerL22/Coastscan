@@ -68,7 +68,7 @@ def _latest_manifests(directory: Path) -> dict[str, dict[str, object]]:
         if "_bathymetry" not in path.name and "optical" not in path.name
     )
     phase2 = sorted(directory.glob("*_bathymetry.json"))
-    phase3 = sorted(directory.glob("*optical*.json"))
+    phase3 = sorted([*directory.glob("*optical*.json"), *directory.glob("*clarity*.json")])
     for stage, candidates in (("phase1", phase1), ("phase2", phase2), ("phase3", phase3)):
         if not candidates:
             continue
