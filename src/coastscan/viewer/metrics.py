@@ -12,6 +12,10 @@ BATHYMETRY_NOTICE = (
     "ledge or resolve submerged obstacles."
 )
 QUALITY_NOTICE = "This is a data-quality indicator, not a site-level judgement."
+OPTICAL_NOTICE = (
+    "Historical region-relative optical screening only; this does not measure current conditions, "
+    "physical visibility depth, underwater clearance, suitability or safety."
+)
 
 
 def _continuous(
@@ -34,24 +38,35 @@ def _continuous(
         value_format=value_format,
         recommended_scale=scale,  # type: ignore[arg-type]
         missing_value_text="Not available",
-        safety_interpretation=(TERRAIN_NOTICE if category == "terrain" else BATHYMETRY_NOTICE),
+        safety_interpretation=(
+            TERRAIN_NOTICE
+            if category == "terrain"
+            else OPTICAL_NOTICE
+            if category == "optical"
+            else BATHYMETRY_NOTICE
+        ),
     )
 
 
 def _categorical(
-    field: str, name: str, description: str, *, boolean: bool = False
+    field: str,
+    name: str,
+    description: str,
+    *,
+    boolean: bool = False,
+    category: str = "quality",
 ) -> MetricDefinition:
     return MetricDefinition(
         field_name=field,
         display_name=name,
-        category="quality",
+        category=category,  # type: ignore[arg-type]
         unit="",
         description=description,
         higher_is_not_necessarily_better=True,
         value_format="s",
         recommended_scale="categorical",
         missing_value_text="Not recorded",
-        safety_interpretation=QUALITY_NOTICE,
+        safety_interpretation=OPTICAL_NOTICE if category == "optical" else QUALITY_NOTICE,
         kind="boolean" if boolean else "categorical",
     )
 
@@ -275,6 +290,91 @@ _DEFINITIONS = [
         "Share of sampled cells attributed to survey sources where an official lookup is "
         "available.",
     ),
+    _continuous(
+        "clarity_percentile_p50",
+        "Median relative clarity percentile",
+        "optical",
+        "percentile",
+        "Median within-scene, regionally normalised historical clarity signal for the selected "
+        "period.",
+    ),
+    _continuous(
+        "clarity_percentile_p90",
+        "Relative clarity percentile p90",
+        "optical",
+        "percentile",
+        "Upper-decile historical region-relative clarity signal for the selected period.",
+    ),
+    _continuous(
+        "clear_water_observation_share",
+        "Clear-looking observation share",
+        "optical",
+        "share",
+        "Share of valid observations above the configured regional clear-percentile threshold.",
+    ),
+    _continuous(
+        "turbid_water_observation_share",
+        "Turbid-looking observation share",
+        "optical",
+        "share",
+        "Share of valid observations below the configured regional turbidity-proxy threshold.",
+    ),
+    _continuous(
+        "clarity_persistence",
+        "Historical clarity persistence",
+        "optical",
+        "share",
+        "Persistence of relatively clear-looking valid observations; not a current-condition "
+        "claim.",
+    ),
+    _continuous(
+        "clarity_variability_iqr",
+        "Clarity variability IQR",
+        "optical",
+        "percentile points",
+        "Interquartile range of region-relative clarity observations.",
+    ),
+    _continuous(
+        "valid_scene_count",
+        "Valid optical scene count",
+        "optical",
+        "scenes",
+        "Distinct official Sentinel-2 scenes supporting the selected period.",
+        value_format=".0f",
+    ),
+    _continuous(
+        "valid_observation_share",
+        "Valid optical observation share",
+        "optical",
+        "share",
+        "Share of candidate observations remaining after optical exclusions.",
+    ),
+    _continuous(
+        "bottom_visibility_proxy_share",
+        "Apparent bottom-texture observation share",
+        "optical",
+        "share",
+        "Share of suitable observations with a bottom-like texture proxy; no depth is inferred.",
+    ),
+    _continuous(
+        "apparent_bottom_texture_persistence",
+        "Apparent bottom-texture persistence",
+        "optical",
+        "share",
+        "Cross-scene repeatability of apparent texture after quality gating.",
+    ),
+    _categorical(
+        "clarity_data_confidence",
+        "Optical data confidence",
+        "Evidence sufficiency for the selected optical period, separate from clarity.",
+        category="optical",
+    ),
+    _categorical(
+        "clarity_quality_flag",
+        "Optical quality",
+        "Machine-readable quality class for the selected optical period.",
+        category="optical",
+    ),
     _categorical(
         "orientation_status", "Orientation status", "Phase 1 landward/seaward orientation result."
     ),
@@ -323,7 +423,12 @@ def available_metrics(
 def grouped_metric_options(
     columns: Iterable[object], *, include_bathymetry: bool = True
 ) -> dict[str, list[MetricDefinition]]:
-    groups: dict[str, list[MetricDefinition]] = {"Terrain": [], "Bathymetry": [], "Quality": []}
+    groups: dict[str, list[MetricDefinition]] = {
+        "Terrain": [],
+        "Bathymetry": [],
+        "Optical": [],
+        "Quality": [],
+    }
     for definition in available_metrics(columns, include_bathymetry=include_bathymetry):
         key = definition.category.title()
         groups[key].append(definition)

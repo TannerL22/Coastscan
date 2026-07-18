@@ -97,6 +97,26 @@ def apply_filters(frame: gpd.GeoDataFrame, filters: ViewerFilters) -> gpd.GeoDat
     mask &= _maximum_mask(
         frame, "global_fallback_source_share", filters.maximum_global_fallback_share
     )
+    mask &= _minimum_mask(frame, "valid_scene_count", filters.minimum_valid_scenes)
+    mask &= _minimum_mask(frame, "valid_year_count", filters.minimum_valid_years)
+    mask &= _minimum_mask(frame, "valid_month_count", filters.minimum_valid_months)
+    mask &= _minimum_mask(frame, "clarity_percentile_p50", filters.minimum_clarity_percentile)
+    mask &= _minimum_mask(frame, "clear_water_observation_share", filters.minimum_clear_water_share)
+    mask &= _minimum_mask(frame, "clarity_persistence", filters.minimum_clarity_persistence)
+    mask &= _maximum_mask(frame, "glint_excluded_share", filters.maximum_glint_exclusion)
+    mask &= _maximum_mask(frame, "shadow_excluded_share", filters.maximum_shadow_exclusion)
+    if filters.clarity_confidences:
+        mask &= (
+            frame.clarity_data_confidence.astype(str).isin(filters.clarity_confidences)
+            if "clarity_data_confidence" in frame
+            else False
+        )
+    if filters.clarity_qualities:
+        mask &= (
+            frame.clarity_quality_flag.astype(str).isin(filters.clarity_qualities)
+            if "clarity_quality_flag" in frame
+            else False
+        )
     search = filters.segment_search.strip().casefold()
     if search:
         mask &= frame.segment_id.astype(str).str.casefold().str.contains(search, regex=False)

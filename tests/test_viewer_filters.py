@@ -80,3 +80,20 @@ def test_reset_state_removes_dynamic_filter_keys() -> None:
     assert "filter_search" not in state
     assert "filter_depth_range" not in state
     assert state["viewer_metric"] == "slope_p90_deg"
+
+
+def test_optical_filters_are_additive_and_missing_safe(phase3_viewer_project: Path) -> None:
+    frame = load_viewer_data("viewer_demo", phase3_viewer_project).display_segments
+    filtered = apply_filters(
+        frame,
+        ViewerFilters(
+            minimum_valid_scenes=10,
+            minimum_clarity_percentile=50,
+            minimum_clear_water_share=0.3,
+            maximum_glint_exclusion=0.2,
+            clarity_confidences=frozenset({"high"}),
+        ),
+    )
+    assert len(filtered) < len(frame)
+    assert (filtered.valid_scene_count >= 10).all()
+    assert (filtered.clarity_percentile_p50 >= 50).all()

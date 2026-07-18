@@ -4,6 +4,7 @@ from pathlib import Path
 
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 import pytest
 import rasterio
 from rasterio.transform import from_origin
@@ -215,3 +216,47 @@ def terrain_only_viewer_project(tmp_path: Path) -> Path:
     for name in ("coast_segments.parquet", "segment_features.parquet"):
         (destination / name).write_bytes((source_directory / name).read_bytes())
     return tmp_path
+
+
+@pytest.fixture
+def phase3_viewer_project(viewer_project: Path) -> Path:
+    """Phase 2 viewer fixture extended with compact synthetic optical attributes."""
+    directory = viewer_project / "data" / "processed" / "viewer_demo"
+    phase2 = gpd.read_parquet(directory / "segment_features_phase2.parquet")
+    count = len(phase2)
+    phase2["valid_scene_count"] = np.arange(count) + 5
+    phase2["valid_year_count"] = 5
+    phase2["valid_month_count"] = 5
+    phase2["valid_observation_share"] = np.linspace(0.3, 0.9, count)
+    phase2["clarity_percentile_p50"] = np.linspace(10, 90, count)
+    phase2["clarity_percentile_p90"] = np.linspace(30, 98, count)
+    phase2["clear_water_observation_share"] = np.linspace(0.1, 0.8, count)
+    phase2["turbid_water_observation_share"] = np.linspace(0.8, 0.1, count)
+    phase2["clarity_persistence"] = np.linspace(0.1, 0.8, count)
+    phase2["clarity_variability_iqr"] = np.linspace(5, 30, count)
+    phase2["glint_excluded_share"] = np.linspace(0.01, 0.2, count)
+    phase2["shadow_excluded_share"] = np.linspace(0.2, 0.01, count)
+    phase2["clarity_data_confidence"] = "high"
+    phase2["clarity_quality_flag"] = "usable"
+    phase2["best_month"] = "july"
+    phase2["most_reliable_month"] = "june"
+    phase2.to_parquet(directory / "segment_features_phase3.parquet", index=False)
+    rows = []
+    for period, shift in (("june", -5), ("july", 5), ("extended_summer_may_sep", 0)):
+        for index, segment_id in enumerate(phase2.segment_id.astype(str)):
+            rows.append(
+                {
+                    "segment_id": segment_id,
+                    "zone_type": "nearshore",
+                    "period_id": period,
+                    "configured_months": "6,7,8",
+                    "valid_scene_count": index + 3,
+                    "valid_year_count": 5,
+                    "valid_month_count": 1 if period != "extended_summer_may_sep" else 5,
+                    "clarity_percentile_p50": float(np.clip(10 + index * 7 + shift, 0, 100)),
+                    "clarity_data_confidence": "high",
+                    "clarity_quality_flag": "usable",
+                }
+            )
+    pd.DataFrame(rows).to_parquet(directory / "clarity_seasonal_features.parquet", index=False)
+    return viewer_project

@@ -61,6 +61,19 @@ def test_terrain_only_mode_starts_and_disables_bathymetry(
     assert app.checkbox(key="viewer_transects").disabled
 
 
+def test_phase3_mode_exposes_period_optical_metrics_and_panel(
+    phase3_viewer_project: Path, monkeypatch
+) -> None:
+    _configure(monkeypatch, phase3_viewer_project, "viewer_demo")
+    app = AppTest.from_file(APP_PATH, default_timeout=20).run()
+    assert not app.exception
+    assert app.selectbox(key="viewer_optical_period")
+    assert any("Optical" in option for option in app.selectbox(key="viewer_metric").options)
+    app.selectbox(key="segment_picker").select("viewer_demo_segment_00").run()
+    assert not app.exception
+    assert len(app.tabs) == 4
+
+
 def test_missing_outputs_show_actionable_error(tmp_path: Path, monkeypatch) -> None:
     _configure(monkeypatch, tmp_path, "missing_region")
     app = AppTest.from_file(APP_PATH, default_timeout=20).run()

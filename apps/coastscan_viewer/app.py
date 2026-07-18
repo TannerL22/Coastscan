@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from coastscan.exceptions import ViewerError
-from coastscan.viewer.data import load_display_transects, load_viewer_data
+from coastscan.viewer.data import load_display_transects, load_viewer_data, with_optical_period
 from coastscan.viewer.filters import apply_filters, reset_filter_state
 from coastscan.viewer.formatting import (
     analytical_csv_table,
@@ -171,9 +171,11 @@ def _render_legend(
 
 def _selected_segment_panel(row: pd.Series, coastline_source_id: str | None) -> None:
     st.subheader("Selected segment")
-    identity, terrain, bathymetry = st.tabs(
-        ["Identity & provenance", "Terrain profile", "Bathymetry profile"]
-    )
+    labels = ["Identity & provenance", "Terrain profile", "Bathymetry profile"]
+    if "clarity_data_confidence" in row.index:
+        labels.append("Optical history")
+    tabs = st.tabs(labels)
+    identity, terrain, bathymetry = tabs[:3]
     with identity:
         st.code(str(row.segment_id), language=None)
         first, second, third, fourth = st.columns(4)
@@ -253,6 +255,43 @@ def _selected_segment_panel(row: pd.Series, coastline_source_id: str | None) -> 
                 "Regional bathymetry is not a measurement beneath an individual cliff and does "
                 "not resolve submerged obstacles."
             )
+    if len(tabs) == 4:
+        with tabs[3]:
+            _display_metrics(
+                row,
+                [
+                    "valid_scene_count",
+                    "valid_year_count",
+                    "valid_month_count",
+                    "clarity_percentile_p50",
+                    "clarity_percentile_p90",
+                    "clear_water_observation_share",
+                    "turbid_water_observation_share",
+                    "clarity_persistence",
+                    "clarity_variability_iqr",
+                    "bottom_visibility_proxy_share",
+                    "apparent_bottom_texture_persistence",
+                    "clarity_data_confidence",
+                    "clarity_quality_flag",
+                ],
+            )
+            if row.get("best_month"):
+                best_label = str(row.get("best_month")).replace("_", " ").title()
+                reliable_label = str(row.get("most_reliable_month")).replace("_", " ").title()
+                st.write(
+                    f"**Best historical month:** {best_label} · "
+                    f"**Most reliable month:** {reliable_label}"
+                )
+            limitations = str(row.get("clarity_limitation_reasons", "")).strip()
+            if limitations.casefold() == "nan":
+                limitations = ""
+            if limitations:
+                st.write("**Primary limitations:** " + limitations.replace("_", " "))
+            st.caption(
+                "Historical, region-relative coastal-water screening. It does not measure current "
+                "visibility, physical visibility depth, underwater clearance, suitability or "
+                "safety."
+            )
     st.info(deterministic_interpretation(row), icon="ℹ️")
 
 
@@ -287,6 +326,27 @@ if not data.has_bathymetry:
         "Terrain-only mode. Build Phase 2 to enable regional bathymetry controls:\n\n"
         f"`uv run coastscan build-bathymetry --region {region} --write-samples`"
     )
+
+if data.has_optical:
+    period_labels = {
+        "may": "May",
+        "june": "June",
+        "july": "July",
+        "august": "August",
+        "september": "September",
+        "summer_jja": "Summer JJA",
+        "extended_summer_may_sep": "Extended summer May–September",
+        "historical_aggregate": "Historical aggregate",
+    }
+    selected_period = st.sidebar.selectbox(
+        "Optical period",
+        list(period_labels),
+        format_func=period_labels.__getitem__,
+        index=6,
+        key="viewer_optical_period",
+    )
+    if selected_period != "historical_aggregate":
+        data = with_optical_period(data, selected_period)
 
 metric_options = available_metrics(
     data.display_segments.columns, include_bathymetry=data.has_bathymetry
@@ -453,6 +513,85 @@ if data.has_bathymetry:
             lower=False,
         )
 
+minimum_valid_scenes = None
+minimum_valid_years = None
+minimum_valid_months = None
+minimum_clarity = None
+minimum_clear_share = None
+minimum_persistence = None
+maximum_glint = None
+maximum_shadow = None
+clarity_confidences: list[str] = []
+clarity_qualities: list[str] = []
+if data.has_optical:
+    with st.sidebar.expander("Optical filters"):
+        minimum_valid_scenes = _single_limit(
+            "Minimum valid scenes",
+            data.display_segments,
+            "valid_scene_count",
+            "filter_min_valid_scenes",
+            lower=True,
+        )
+        minimum_valid_years = _single_limit(
+            "Minimum valid years",
+            data.display_segments,
+            "valid_year_count",
+            "filter_min_valid_years",
+            lower=True,
+        )
+        minimum_valid_months = _single_limit(
+            "Minimum valid months",
+            data.display_segments,
+            "valid_month_count",
+            "filter_min_valid_months",
+            lower=True,
+        )
+        minimum_clarity = _single_limit(
+            "Minimum median clarity percentile",
+            data.display_segments,
+            "clarity_percentile_p50",
+            "filter_min_clarity",
+            lower=True,
+        )
+        minimum_clear_share = _single_limit(
+            "Minimum clear-looking observation share",
+            data.display_segments,
+            "clear_water_observation_share",
+            "filter_min_clear_share",
+            lower=True,
+        )
+        minimum_persistence = _single_limit(
+            "Minimum clarity persistence",
+            data.display_segments,
+            "clarity_persistence",
+            "filter_min_persistence",
+            lower=True,
+        )
+        maximum_glint = _single_limit(
+            "Maximum glint exclusion",
+            data.display_segments,
+            "glint_excluded_share",
+            "filter_max_glint",
+            lower=False,
+        )
+        maximum_shadow = _single_limit(
+            "Maximum shadow exclusion",
+            data.display_segments,
+            "shadow_excluded_share",
+            "filter_max_shadow",
+            lower=False,
+        )
+        clarity_confidences = st.multiselect(
+            "Clarity confidence",
+            sorted(data.display_segments.clarity_data_confidence.dropna().astype(str).unique()),
+            key="filter_clarity_confidence",
+        )
+        clarity_qualities = st.multiselect(
+            "Clarity quality",
+            sorted(data.display_segments.clarity_quality_flag.dropna().astype(str).unique()),
+            key="filter_clarity_quality",
+        )
+
 filters = ViewerFilters(
     orientation_statuses=frozenset(orientation) if orientation else None,
     terrain_availability=terrain_availability,
@@ -476,6 +615,16 @@ filters = ViewerFilters(
     gradient_field=gradient_field,
     gradient_range=gradient_range,
     maximum_global_fallback_share=maximum_fallback,
+    minimum_valid_scenes=minimum_valid_scenes,
+    minimum_valid_years=minimum_valid_years,
+    minimum_valid_months=minimum_valid_months,
+    minimum_clarity_percentile=minimum_clarity,
+    minimum_clear_water_share=minimum_clear_share,
+    minimum_clarity_persistence=minimum_persistence,
+    maximum_glint_exclusion=maximum_glint,
+    maximum_shadow_exclusion=maximum_shadow,
+    clarity_confidences=frozenset(clarity_confidences) if clarity_confidences else None,
+    clarity_qualities=frozenset(clarity_qualities) if clarity_qualities else None,
     segment_search=search,
 )
 visible = apply_filters(data.display_segments, filters)

@@ -2,6 +2,7 @@
 
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Literal
 
@@ -35,11 +36,13 @@ def discover_viewer_paths(region_id: str, root: Path | None = None) -> ViewerPat
     processed = project_root / "data" / "processed" / region_id
     return ViewerPaths(
         region_id=region_id,
+        phase3_segments=processed / "segment_features_phase3.parquet",
         preferred_segments=processed / "segment_features_phase2.parquet",
         phase1_segments=processed / "segment_features.parquet",
         coast_segments=processed / "coast_segments.parquet",
         bathymetry_features=processed / "bathymetry_features.parquet",
         bathymetry_transects=processed / "bathymetry_transects.parquet",
+        clarity_seasonal_features=processed / "clarity_seasonal_features.parquet",
         manifest_directory=project_root / "outputs" / "manifests" / region_id,
     )
 
@@ -59,9 +62,14 @@ def _latest_manifests(directory: Path) -> dict[str, dict[str, object]]:
     if not directory.is_dir():
         return {}
     result: dict[str, dict[str, object]] = {}
-    phase1 = sorted(path for path in directory.glob("*.json") if "_bathymetry" not in path.name)
+    phase1 = sorted(
+        path
+        for path in directory.glob("*.json")
+        if "_bathymetry" not in path.name and "optical" not in path.name
+    )
     phase2 = sorted(directory.glob("*_bathymetry.json"))
-    for stage, candidates in (("phase1", phase1), ("phase2", phase2)):
+    phase3 = sorted(directory.glob("*optical*.json"))
+    for stage, candidates in (("phase1", phase1), ("phase2", phase2), ("phase3", phase3)):
         if not candidates:
             continue
         try:
@@ -159,9 +167,13 @@ def _load_segments_cached(
 def load_viewer_data(region_id: str, root: Path | None = None) -> ViewerData:
     """Load the preferred joined output or fall back explicitly to terrain-only mode."""
     paths = discover_viewer_paths(region_id, root)
-    if paths.preferred_segments.is_file():
+    mode: Literal["phase3", "phase2", "terrain_only"]
+    if paths.phase3_segments.is_file():
+        selected = paths.phase3_segments
+        mode = "phase3"
+    elif paths.preferred_segments.is_file():
         selected = paths.preferred_segments
-        mode: Literal["phase2", "terrain_only"] = "phase2"
+        mode = "phase2"
     elif paths.phase1_segments.is_file():
         selected = paths.phase1_segments
         mode = "terrain_only"
@@ -221,6 +233,45 @@ def load_viewer_data(region_id: str, root: Path | None = None) -> ViewerData:
         maximum_bathymetry_transect_length_m=maximum_bathymetry_transect_length_m,
         coastline_source_id=coastline_source_id,
         manifests=_latest_manifests(paths.manifest_directory),
+    )
+
+
+@st.cache_data(show_spinner=False)
+def _load_seasonal_cached(path_text: str, signature: tuple[str, int, int, str]) -> pd.DataFrame:
+    del signature
+    return pd.read_parquet(path_text)
+
+
+def with_optical_period(data: ViewerData, period_id: str) -> ViewerData:
+    """Return a display-only period join while retaining coastline geometry authority."""
+    path = data.paths.clarity_seasonal_features
+    if not data.has_optical or not path.is_file():
+        return data
+    seasonal = _load_seasonal_cached(str(path), _signature(path))
+    chosen = seasonal.loc[
+        (seasonal.period_id.astype(str) == period_id)
+        & (seasonal.zone_type.astype(str) == "nearshore")
+    ].copy()
+    if chosen.segment_id.astype(str).duplicated().any():
+        raise ViewerError(f"Optical period {period_id} is not one-to-one by segment_id")
+    chosen["segment_id"] = chosen.segment_id.astype(str)
+    drop = [
+        column
+        for column in chosen.columns
+        if column not in {"segment_id", "period_id", "zone_type", "configured_months"}
+    ]
+
+    def joined(frame: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        base = frame.drop(columns=[column for column in drop if column in frame], errors="ignore")
+        result = base.merge(
+            chosen[["segment_id", *drop]], on="segment_id", how="left", validate="one_to_one"
+        )
+        return gpd.GeoDataFrame(result, geometry=frame.geometry.name, crs=frame.crs)
+
+    return replace(
+        data,
+        analytical_segments=joined(data.analytical_segments),
+        display_segments=joined(data.display_segments),
     )
 
 

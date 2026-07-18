@@ -12,6 +12,7 @@ from coastscan.viewer.data import (
     load_display_transects,
     load_viewer_data,
     missing_outputs_message,
+    with_optical_period,
 )
 from coastscan.viewer.diagnostics import inspect_viewer_geometry
 
@@ -37,6 +38,23 @@ def test_terrain_only_fallback_loads(terrain_only_viewer_project: Path) -> None:
     assert data.mode == "terrain_only"
     assert not data.has_bathymetry
     assert "bathymetry_screening_class" not in data.display_segments
+
+
+def test_phase3_preference_and_period_join_keep_authoritative_geometry(
+    phase3_viewer_project: Path,
+) -> None:
+    data = load_viewer_data("viewer_demo", phase3_viewer_project)
+    assert data.mode == "phase3"
+    assert data.has_optical and data.has_bathymetry
+    assert data.attribute_source.name == "segment_features_phase3.parquet"
+    geometry_checksum = data.geometry_checksum
+    june = with_optical_period(data, "june")
+    july = with_optical_period(data, "july")
+    assert june.geometry_checksum == geometry_checksum == july.geometry_checksum
+    assert june.geometry_source.name == "coast_segments.parquet"
+    assert not june.display_segments.clarity_percentile_p50.equals(
+        july.display_segments.clarity_percentile_p50
+    )
 
 
 def test_missing_outputs_are_actionable(tmp_path: Path) -> None:

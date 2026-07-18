@@ -9,7 +9,7 @@ import geopandas as gpd
 from coastscan.viewer.validation import GeometryValidationResult
 
 MetricKind = Literal["continuous", "categorical", "boolean"]
-MetricCategory = Literal["terrain", "bathymetry", "quality"]
+MetricCategory = Literal["terrain", "bathymetry", "optical", "quality"]
 ScaleType = Literal["sequential", "diverging", "categorical"]
 ScaleMode = Literal["robust", "full"]
 Availability = Literal["all", "available", "missing"]
@@ -33,18 +33,20 @@ class MetricDefinition:
 @dataclass(frozen=True)
 class ViewerPaths:
     region_id: str
+    phase3_segments: Path
     preferred_segments: Path
     phase1_segments: Path
     coast_segments: Path
     bathymetry_features: Path
     bathymetry_transects: Path
+    clarity_seasonal_features: Path
     manifest_directory: Path
 
 
 @dataclass(frozen=True)
 class ViewerData:
     region_id: str
-    mode: Literal["phase2", "terrain_only"]
+    mode: Literal["phase3", "phase2", "terrain_only"]
     analytical_segments: gpd.GeoDataFrame
     display_segments: gpd.GeoDataFrame
     paths: ViewerPaths
@@ -61,7 +63,11 @@ class ViewerData:
 
     @property
     def has_bathymetry(self) -> bool:
-        return self.mode == "phase2"
+        return self.mode in {"phase2", "phase3"}
+
+    @property
+    def has_optical(self) -> bool:
+        return self.mode == "phase3"
 
 
 @dataclass(frozen=True)
@@ -92,4 +98,14 @@ class ViewerFilters:
     gradient_field: str | None = None
     gradient_range: tuple[float | None, float | None] = (None, None)
     maximum_global_fallback_share: float | None = None
+    minimum_valid_scenes: float | None = None
+    minimum_valid_years: float | None = None
+    minimum_valid_months: float | None = None
+    minimum_clarity_percentile: float | None = None
+    minimum_clear_water_share: float | None = None
+    minimum_clarity_persistence: float | None = None
+    maximum_glint_exclusion: float | None = None
+    maximum_shadow_exclusion: float | None = None
+    clarity_confidences: frozenset[str] | None = None
+    clarity_qualities: frozenset[str] | None = None
     segment_search: str = ""

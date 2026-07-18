@@ -42,6 +42,18 @@ uncertainty.
 `insufficient` describe data usability. They are not a ranking of locations. The real pilot is
 capped at `background_only` because its bathymetry is predominantly coarse fallback evidence.
 
+### Historical coastal-water clarity
+
+Phase 3 uses official Sentinel-2 Level-2A surface-reflectance assets. Cloud, cirrus, shadow, land,
+dark-shadow, whitewater and sunglint-risk exclusions are quantified before segment-owned seaward
+zones are summarised. Blue–green, red–green and NIR components are normalised within each scene and
+zone type, so clarity is a regional historical percentile rather than a physical concentration.
+
+Monthly and seasonal tables report valid-scene coverage, clear-looking observation share,
+persistence, variability and evidence confidence. Apparent bottom texture is a separate,
+repeatability-gated proxy. Neither indicator estimates visibility depth, current conditions,
+underwater clearance, submerged obstacles, suitability or safety.
+
 ### Why there is no combined score
 
 Terrain relief and regional bathymetry can be filtered as separate transparent measurements.

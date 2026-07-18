@@ -42,6 +42,8 @@ distribution_fields = [
     "terrain_quality_flag",
     "bathymetry_screening_class",
     "bathymetry_quality_flag",
+    "clarity_data_confidence",
+    "clarity_quality_flag",
 ]
 columns = st.columns(2)
 for index, field in enumerate(distribution_fields):
@@ -57,6 +59,10 @@ numeric_fields = [
     "bathymetry_valid_transect_share",
     "bathymetry_first_valid_distance_p50_m",
     "global_fallback_source_share",
+    "valid_scene_count",
+    "valid_observation_share",
+    "glint_excluded_share",
+    "shadow_excluded_share",
 ]
 for field in numeric_fields:
     if field in segments and segments[field].notna().any():
@@ -74,6 +80,13 @@ important = [
     "depth_500m_p50_m",
     "gradient_250_1000m_p50",
     "global_fallback_source_share",
+    "valid_scene_count",
+    "valid_year_count",
+    "valid_month_count",
+    "clarity_percentile_p50",
+    "clear_water_observation_share",
+    "clarity_persistence",
+    "apparent_bottom_texture_persistence",
 ]
 st.subheader("Missing important fields")
 st.dataframe(missing_value_counts(segments, important), hide_index=True, width="stretch")
@@ -86,6 +99,8 @@ quality_metric_fields = [
         "bathymetry_screening_class",
         "bathymetry_valid_transect_share",
         "bathymetry_first_valid_distance_p50_m",
+        "clarity_data_confidence",
+        "valid_scene_count",
     )
     if field in segments
 ]

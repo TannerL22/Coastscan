@@ -34,6 +34,7 @@ def test_available_metrics_excludes_missing_and_bathymetry_when_disabled() -> No
     assert terrain_only == {"slope_p90_deg", "orientation_status"}
     assert metric_definition("orientation_status").kind == "categorical"  # type: ignore[union-attr]
     assert metric_definition("orientation_source_mismatch_flag").kind == "boolean"  # type: ignore[union-attr]
+    assert metric_definition("clarity_percentile_p50").category == "optical"  # type: ignore[union-attr]
 
 
 def test_continuous_scales_cover_robust_full_constant_missing_and_negative() -> None:
