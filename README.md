@@ -38,8 +38,10 @@ with provenance; and a separate global grid only for a real uncovered gap. No pu
 intersects the Mallorca northwest pilot, so it uses EMODnet DTM 2024 LAT at about 115 m native spacing.
 A 100 m target is below native resolution; 250–1,000 m values remain regional proxies.
 
-Out of scope: water clarity, satellite-derived bathymetry generation, geology, waves, protected areas,
-access, exploration scoring, machine learning, frontend work and site-safety conclusions.
+Out of scope: satellite-derived bathymetry generation, geology, waves, protected areas, access,
+exploration scoring, machine learning, a production vector-tile frontend or full public platform, and
+site-safety conclusions. The local and hosted analytical viewer is implemented; Phase 3 adds only a
+narrow seasonal optical-screening integration to that viewer.
 
 ## Install
 
@@ -87,6 +89,7 @@ uv run coastscan build-bathymetry --region mallorca_northwest_pilot --write-samp
 
 # Local Phase 2.5 viewer
 uv run coastscan inspect-viewer-geometry --region mallorca_northwest_pilot
+uv run coastscan validate-published-snapshot --snapshot mallorca_northwest_viewer
 uv run coastscan view-map --region mallorca_northwest_pilot
 ```
 
@@ -105,7 +108,9 @@ secrets are Git-ignored. See `docs/local_viewer.md` for architecture, filters, t
 
 The public hosted viewer is available at <https://coastscan.streamlit.app/>. Its repository snapshot
 contains only the small checksum-verified derived Mallorca viewer tables and generated AOI required at
-runtime; the official raw source datasets remain excluded.
+runtime; the official raw source datasets remain excluded. The machine-readable provenance, licence,
+file-size and SHA-256 record is in
+`data_catalog/published_snapshots/mallorca_northwest_viewer.json`.
 
 For the explicit synthetic demo:
 

@@ -1,0 +1,130 @@
+{
+  "snapshot_id": "mallorca_northwest_viewer",
+  "region_id": "mallorca_northwest_pilot",
+  "snapshot_purpose": "Compact derived Phase 1 and Phase 2 inputs required by the local and hosted analytical viewer.",
+  "generated_at_utc": "2026-07-16T18:34:09.019960+00:00",
+  "published_at_utc": "2026-07-17T15:06:23+00:00",
+  "generation_git_commit": "bd6988fadd9dc07e38fe0ad60fdc682044eacf0c",
+  "publication_git_commit": "a70bec7e054711bafcc90616db33d86e6accfb00",
+  "upstream_phase1_manifest": "outputs/manifests/mallorca_northwest_pilot/20260716T183337327063Z_mallorca_northwest_pilot.json",
+  "upstream_phase2_manifest": "outputs/manifests/mallorca_northwest_pilot/20260716T183402295850Z_mallorca_northwest_pilot_bathymetry.json",
+  "included_files": [
+    "data/processed/mallorca_northwest_pilot/bathymetry_features.parquet",
+    "data/processed/mallorca_northwest_pilot/bathymetry_source_reference_audit.parquet",
+    "data/processed/mallorca_northwest_pilot/bathymetry_transects.parquet",
+    "data/processed/mallorca_northwest_pilot/coast_segments.parquet",
+    "data/processed/mallorca_northwest_pilot/segment_features.parquet",
+    "data/processed/mallorca_northwest_pilot/segment_features_phase2.parquet",
+    "data/processed/mallorca_northwest_pilot/terrain_features.parquet",
+    "data/processed/mallorca_northwest_pilot/transects.parquet",
+    "data/raw/boundaries/mallorca_northwest_aoi.gpkg"
+  ],
+  "file_sizes": {
+    "data/processed/mallorca_northwest_pilot/bathymetry_features.parquet": 82807,
+    "data/processed/mallorca_northwest_pilot/bathymetry_source_reference_audit.parquet": 3181,
+    "data/processed/mallorca_northwest_pilot/bathymetry_transects.parquet": 60833,
+    "data/processed/mallorca_northwest_pilot/coast_segments.parquet": 101500,
+    "data/processed/mallorca_northwest_pilot/segment_features.parquet": 142395,
+    "data/processed/mallorca_northwest_pilot/segment_features_phase2.parquet": 223178,
+    "data/processed/mallorca_northwest_pilot/terrain_features.parquet": 42929,
+    "data/processed/mallorca_northwest_pilot/transects.parquet": 112139,
+    "data/raw/boundaries/mallorca_northwest_aoi.gpkg": 98304
+  },
+  "sha256_checksums": {
+    "data/processed/mallorca_northwest_pilot/bathymetry_features.parquet": "3215c9a2e20afdc23a83756f8b2e307d4d8ba0a346ffd520b7cc192c75ceb6cf",
+    "data/processed/mallorca_northwest_pilot/bathymetry_source_reference_audit.parquet": "81f8012e39458c779c57abae1c14ff6b6977e33bce2627fbf2d43d171080b1e6",
+    "data/processed/mallorca_northwest_pilot/bathymetry_transects.parquet": "1ad89d457e71021ebb96dcbf655b136b0b3f181569166e1373aca2fe53d1be48",
+    "data/processed/mallorca_northwest_pilot/coast_segments.parquet": "dc6d795e5ec68d5360eca0f48cdc1902b153a765756737ca38ea12f89c88add1",
+    "data/processed/mallorca_northwest_pilot/segment_features.parquet": "6c4974ab1b2991a9efaa9e92c570ac4a8f1d85b8631959767765e130d53c02f0",
+    "data/processed/mallorca_northwest_pilot/segment_features_phase2.parquet": "55cf0df311efcbf74ea2e44ccaa37fc385daa50f0e57d3e4ce66ebe8c9f8662a",
+    "data/processed/mallorca_northwest_pilot/terrain_features.parquet": "f66c1c3aed52cb5d9a14922cad719dce0fb54e26dc69d2748157e244351dd39c",
+    "data/processed/mallorca_northwest_pilot/transects.parquet": "c83b18812b687f43ede06f6b55e503e52a2d0d3c247b0b67de858d6cecd30b95",
+    "data/raw/boundaries/mallorca_northwest_aoi.gpkg": "5ea9d42aac14afde0d1c70cd8e0b3345d73a4e17ae3d94f04d4a076334e9e34a"
+  },
+  "source_datasets": [
+    {
+      "source_id": "ihm_spain_coastline",
+      "provider": "Instituto Hidrografico de la Marina, distributed by CNIG",
+      "product": "Linea de costa",
+      "release": "LC2022 (CNIG catalogue attribution label LC 2023)",
+      "official_reference": "https://centrodedescargas.cnig.es/CentroDescargas/detalleArchivo?sec=9000006"
+    },
+    {
+      "source_id": "cnig_administrative_boundaries",
+      "provider": "Instituto Geografico Nacional / CNIG",
+      "product": "Limites municipales, provinciales y autonomicos",
+      "release": "BDLJE 2026-02",
+      "official_reference": "https://centrodedescargas.cnig.es/CentroDescargas/detalleArchivo?sec=9000029"
+    },
+    {
+      "source_id": "cnig_mdt02_cob2",
+      "provider": "Instituto Geografico Nacional / CNIG",
+      "product": "MDT02 - 2a cobertura",
+      "release": "PNOA-LiDAR second coverage 2015-2021; 2019 Mallorca tiles",
+      "official_reference": "https://centrodedescargas.cnig.es/CentroDescargas/modelo-digital-terreno-mdt02-segunda-cobertura"
+    },
+    {
+      "source_id": "emodnet_dtm_2024_lat",
+      "provider": "EMODnet Bathymetry",
+      "product": "Digital Bathymetry DTM, LAT",
+      "release": "2024",
+      "official_reference": "https://doi.org/10.12770/cf51df64-56f9-4a99-b1aa-36b8d7b743a1"
+    }
+  ],
+  "source_providers": [
+    "Instituto Hidrografico de la Marina",
+    "Instituto Geografico Nacional / Centro Nacional de Informacion Geografica",
+    "EMODnet Bathymetry / European Union"
+  ],
+  "source_releases": {
+    "ihm_spain_coastline": "LC2022 (CNIG catalogue attribution label LC 2023)",
+    "cnig_administrative_boundaries": "BDLJE 2026-02",
+    "cnig_mdt02_cob2": "PNOA-LiDAR second coverage 2015-2021; 2019 Mallorca tiles",
+    "emodnet_dtm_2024_lat": "2024"
+  },
+  "licences": {
+    "ihm_spain_coastline": "Free reuse under the IHM/CNIG geographic-information licence implementing Orden FOM/2807/2015, compatible with CC BY 4.0, with mandatory source recognition; terms cover derivatives.",
+    "cnig_administrative_boundaries": "IGN/CNIG use licence under Orden FOM/2807/2015, compatible with CC BY 4.0; free lawful reuse with mandatory recognition of IGN origin and ownership; terms cover derivatives.",
+    "cnig_mdt02_cob2": "IGN/CNIG use licence under Orden FOM/2807/2015, compatible with CC BY 4.0; free lawful reuse with mandatory recognition of IGN origin and ownership; terms cover derivatives.",
+    "emodnet_dtm_2024_lat": "Creative Commons Attribution 4.0 International (CC BY 4.0); EMODnet-created data products are EU-owned and licensed under CC BY 4.0 unless stated otherwise."
+  },
+  "required_attribution": [
+    "Obra derivada de LC 2023 CC-BY 4.0 armada.mde.es/ihm/",
+    "Obra derivada de BDLJE CC-BY 4.0 ign.es",
+    "Obra derivada de MDT02-cob2 2015-2021 CC-BY 4.0 ign.es",
+    "This data product was created by EMODnet (https://emodnet.ec.europa.eu/en/), and is owned by the EU and licensed under the Creative Commons Attribution 4.0 International (CC BY 4.0) license."
+  ],
+  "derived_output_statement": "The snapshot contains project-authored AOI geometry and compact vector/tabular analytical derivatives. It does not contain the IHM coastline source archive, CNIG administrative or elevation source datasets, or the EMODnet source grid. Segment-level terrain and regional bathymetry values are screening derivatives and are not navigation, site-level depth, underwater-clearance or safety information.",
+  "excluded_source_data": [
+    "data/raw/coastline/LC.zip and extracted IHM coastline files",
+    "data/raw/boundaries/LINEAS_LIMITE.zip and extracted CNIG administrative boundaries",
+    "data/raw/elevation/mdt02/*.TIF",
+    "data/raw/bathymetry/emodnet_dtm_2024/*.nc",
+    "data/interim/**",
+    "large QA images and local caches"
+  ],
+  "redistribution_review": {
+    "status": "approved_for_compact_derived_snapshot",
+    "reviewed_at_utc": "2026-07-18T00:00:00+00:00",
+    "review_basis": [
+      "IHM/CNIG legal notice states that use of the geographic products and their derivatives is governed by the Orden FOM/2807/2015 licence compatible with CC BY 4.0.",
+      "CNIG data policy states free lawful use, including derivatives, with mandatory recognition, under a licence compatible with CC BY 4.0.",
+      "EMODnet terms state that EMODnet-created data products are EU-owned and CC BY 4.0 unless otherwise indicated; the selected DTM 2024 product carries no contrary restriction.",
+      "Only compact derived tables and project-authored AOI geometry are included; official raw source datasets are excluded."
+    ],
+    "source_reviews": {
+      "ihm_spain_coastline": "reviewed; derived redistribution permitted with the recorded IHM attribution",
+      "cnig_administrative_boundaries": "reviewed; derived redistribution permitted with the recorded IGN attribution",
+      "cnig_mdt02_cob2": "reviewed; derived redistribution permitted with the recorded IGN attribution",
+      "emodnet_dtm_2024_lat": "reviewed; compact derivatives permitted under CC BY 4.0 with the recorded EMODnet acknowledgement"
+    },
+    "unresolved_uncertainty": []
+  },
+  "viewer_schema_version": "phase2.5.1",
+  "notes": [
+    "The AOI GeoPackage is generated from the project-authored documented pilot bounds; it is not a redistributed source coastline.",
+    "EMODnet DTM 2024 may incorporate restricted originator surveys, but EMODnet publishes the composite DTM product itself under CC BY 4.0; no originator survey data is included here.",
+    "The predominantly background_only bathymetry classification must not be interpreted as local underwater geometry.",
+    "All checksums use SHA-256."
+  ]
+}

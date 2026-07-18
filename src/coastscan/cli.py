@@ -6,12 +6,29 @@ import typer
 from rich.console import Console
 
 from coastscan.acquire import acquire_region_data
+from coastscan.catalog.published_snapshots import validate_published_snapshot
 from coastscan.exceptions import CoastScanError
 from coastscan.pipeline.build_bathymetry import build_bathymetry, inspect_bathymetry
 from coastscan.pipeline.build_region import build_region, inspect_region_inputs
 
 app = typer.Typer(no_args_is_help=True, help="CoastScan coastline morphology pipeline")
 console = Console()
+
+
+@app.command("validate-published-snapshot")
+def validate_published_snapshot_command(
+    snapshot: str = typer.Option(..., "--snapshot", help="Published snapshot identifier"),
+    verbose: bool = typer.Option(False, "--verbose"),
+) -> None:
+    """Verify every publicly committed snapshot file against its manifest."""
+    try:
+        result = validate_published_snapshot(snapshot)
+        console.print_json(json.dumps(result))
+    except CoastScanError as exc:
+        console.print(f"[red]{exc}[/red]")
+        if verbose:
+            raise
+        raise typer.Exit(code=2) from None
 
 
 @app.command("acquire-region-data")
