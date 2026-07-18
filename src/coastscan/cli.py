@@ -8,7 +8,10 @@ from rich.console import Console
 from coastscan.acquire import acquire_region_data
 from coastscan.catalog.published_snapshots import validate_published_snapshot
 from coastscan.exceptions import CoastScanError
+from coastscan.optical.acquire import acquire_optical
+from coastscan.optical.catalogue import inspect_optical
 from coastscan.pipeline.build_bathymetry import build_bathymetry, inspect_bathymetry
+from coastscan.pipeline.build_clarity import build_clarity
 from coastscan.pipeline.build_region import build_region, inspect_region_inputs
 
 app = typer.Typer(no_args_is_help=True, help="CoastScan coastline morphology pipeline")
@@ -177,3 +180,55 @@ def inspect_viewer_geometry_command(
 
 if __name__ == "__main__":
     app()
+
+
+@app.command("inspect-optical")
+def inspect_optical_command(
+    region: str = typer.Option(..., "--region", help="Region ID or YAML path"),
+    refresh: bool = typer.Option(False, "--refresh", help="Refresh the public scene catalogue"),
+    verbose: bool = typer.Option(False, "--verbose"),
+) -> None:
+    """Inspect official Copernicus scenes without requiring imagery credentials."""
+    try:
+        result = inspect_optical(region, refresh=refresh)
+        console.print_json(json.dumps(result))
+    except CoastScanError as exc:
+        console.print(f"[red]{exc}[/red]")
+        if verbose:
+            raise
+        raise typer.Exit(code=2) from None
+
+
+@app.command("acquire-optical")
+def acquire_optical_command(
+    region: str = typer.Option(..., "--region", help="Region ID or YAML path"),
+    refresh_catalogue: bool = typer.Option(False, "--refresh-catalogue"),
+    verbose: bool = typer.Option(False, "--verbose"),
+) -> None:
+    """Acquire AOI-clipped official Copernicus assets using runtime-only S3 credentials."""
+    try:
+        result = acquire_optical(region, refresh_catalogue=refresh_catalogue)
+        console.print_json(json.dumps(result))
+    except CoastScanError as exc:
+        console.print(f"[red]{exc}[/red]")
+        if verbose:
+            raise
+        raise typer.Exit(code=2) from None
+
+
+@app.command("build-clarity")
+def build_clarity_command(
+    region: str = typer.Option(..., "--region", help="Region ID or YAML path"),
+    force: bool = typer.Option(False, "--force"),
+    write_observations: bool = typer.Option(False, "--write-observations"),
+    verbose: bool = typer.Option(False, "--verbose"),
+) -> None:
+    """Build additive relative clarity and apparent-texture screening outputs."""
+    try:
+        result = build_clarity(region, force=force, write_observations=write_observations)
+        console.print_json(json.dumps(result))
+    except CoastScanError as exc:
+        console.print(f"[red]{exc}[/red]")
+        if verbose:
+            raise
+        raise typer.Exit(code=2) from None

@@ -104,6 +104,22 @@ inputs:
       observation_count: value_count
       interpolation_flag: interpolation_flag
       source_reference: cdi_index
+  optical:
+    source_id: copernicus_sentinel2_l2a
+    provider_adapter: copernicus_stac
+    collection: sentinel-2-l2a
+    authentication: copernicus_s3
+    catalogue_endpoint: https://stac.dataspace.copernicus.eu/v1
+    s3_endpoint: https://eodata.dataspace.copernicus.eu
+    required_assets:
+      blue: B02_10m
+      green: B03_10m
+      red: B04_10m
+      nir: B08_10m
+      swir1: B11_20m
+      scene_classification: SCL_20m
+      product_metadata: product_metadata
+      granule_metadata: granule_metadata
 area_of_interest:
   path: data/raw/boundaries/mallorca_northwest_aoi.gpkg
   layer: aoi
@@ -146,3 +162,56 @@ bathymetry:
   shallow_platform_depth_m: 10
   shallow_platform_minimum_share: 0.6
   write_samples: true
+optical:
+  historical_start: 2021-01-01
+  historical_end: 2025-12-31
+  months: [5, 6, 7, 8, 9]
+  include_partial_current_year: false
+  partial_year_label: incomplete
+  periods:
+    may: [5]
+    june: [6]
+    july: [7]
+    august: [8]
+    september: [9]
+    summer_jja: [6, 7, 8]
+    extended_summer_may_sep: [5, 6, 7, 8, 9]
+    full_valid_year: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  catalogue:
+    maximum_catalogue_cloud_cover_percent: 80
+    maximum_items: 500
+    deduplicate_same_datetime: true
+  zones:
+    nearshore_inner_m: 20
+    nearshore_outer_m: 100
+    coastal_inner_m: 100
+    coastal_outer_m: 300
+    context_inner_m: 300
+    context_outer_m: 750
+    along_coast_origin_spacing_m: 25
+  masks:
+    minimum_land_exclusion_m: 20
+    minimum_valid_water_pixels_per_zone: 20
+    minimum_valid_zone_pixel_share: 0.25
+    maximum_cloud_excluded_share: 0.5
+    maximum_shadow_excluded_share: 0.35
+    maximum_glint_excluded_share: 0.35
+    maximum_land_excluded_share: 0.5
+    maximum_whitewater_excluded_share: 0.35
+    enable_glint_risk_mask: true
+    enable_whitewater_mask: true
+    enable_dark_shadow_mask: true
+  clarity:
+    clear_percentile_threshold: 75
+    turbid_percentile_threshold: 25
+    minimum_valid_components: 2
+    minimum_valid_scenes: 12
+    minimum_valid_months: 3
+    minimum_scenes_per_month: 2
+    minimum_regional_population: 5
+  bottom_texture:
+    enabled: true
+    minimum_valid_scenes: 8
+    minimum_cross_scene_persistence: 0.5
+  maximum_optical_cache_gb: 8
+  write_observations: true

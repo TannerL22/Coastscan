@@ -91,14 +91,20 @@ uv run coastscan build-bathymetry --region mallorca_northwest_pilot --write-samp
 uv run coastscan inspect-viewer-geometry --region mallorca_northwest_pilot
 uv run coastscan validate-published-snapshot --snapshot mallorca_northwest_viewer
 uv run coastscan view-map --region mallorca_northwest_pilot
+
+# Phase 3 public catalogue and official imagery workflow
+uv run coastscan inspect-optical --region mallorca_northwest_pilot
+uv run coastscan acquire-optical --region mallorca_northwest_pilot
+uv run coastscan build-clarity --region mallorca_northwest_pilot --write-observations
 ```
 
 Both build commands accept `--skip-qa-map` and `--verbose`. `--force` rebuilds only that stage's cache.
 Changing bathymetry never requires rerunning the 2 m terrain stage.
 
 The viewer opens at `http://localhost:8501` by default. It always uses
-`coast_segments.parquet` as geometry authority, prefers `segment_features_phase2.parquet` for
-attributes and lazily loads validated `bathymetry_transects.parquet` only when that layer is enabled.
+`coast_segments.parquet` as geometry authority, prefers `segment_features_phase3.parquet` and then
+`segment_features_phase2.parquet` for attributes, and lazily loads validated
+`bathymetry_transects.parquet` only when that layer is enabled.
 If Phase 2 is absent, `segment_features.parquet` enables a clearly labelled terrain-only mode and
 bathymetry controls are disabled. Missing or spatially invalid inputs stop with actionable errors.
 
@@ -127,7 +133,12 @@ uv run coastscan build-region --region synthetic_demo --force --write-samples
 - `data/processed/<region>/bathymetry_transects.parquet`: separate long Phase 2 transects.
 - `data/processed/<region>/bathymetry_features.parquet`: regional bathymetry proxies.
 - `data/processed/<region>/segment_features_phase2.parquet`: descriptive Phase 1/2 join.
-- `outputs/manifests/<region>/`: separate timestamped Phase 1 and Phase 2 manifests.
+- `data_catalog/optical/<region>_scenes.parquet`: stable official scene IDs and selection audit.
+- `data/processed/<region>/optical_zones.parquet`: segment-owned nearshore/context zones.
+- `data/processed/<region>/clarity_features.parquet`: one historical optical row per segment.
+- `data/processed/<region>/clarity_seasonal_features.parquet`: period and zone optical summaries.
+- `data/processed/<region>/segment_features_phase3.parquet`: additive Phase 1/2/3 viewer join.
+- `outputs/manifests/<region>/`: separate Phase 1, Phase 2 and Phase 3 manifests.
 - `outputs/qa/<region>/`: machine-readable QA and static maps/cross-sections.
 
 Raw sources, interim products and run outputs are Git-ignored. The public repository stores acquisition
@@ -148,6 +159,8 @@ uv run mypy src
 The synthetic suite covers coastline geometries and terrestrial rasters plus canonical bathymetry sign
 conversion, zero/nodata behavior, resolution classes, separate transects, known gradients/contours,
 provider methods, atomic download/reuse, Phase 2 manifests, cache reuse and stale-upstream rejection.
+Optical tests cover catalogue selection, processing-baseline preference, radiometry, resampling,
+seaward zones, exclusions, relative components, aggregation, confidence and texture repeatability.
 Viewer tests cover authoritative geometry/attribute joins, CRS and AOI validation, immutable
 reprojection, independent LineString/MultiLineString path conversion, fit-bounds behavior, transects,
 flag overlays, metric metadata, filters, colour scales, selection, terrain-only operation, invalid or

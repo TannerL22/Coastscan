@@ -6,6 +6,8 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pyproj import CRS
 
+from coastscan.models.optical import OpticalConfig, OpticalInput
+
 
 class StrictModel(BaseModel):
     """Reject misspelled configuration keys."""
@@ -135,6 +137,7 @@ class InputsConfig(StrictModel):
     land_polygon: VectorInput | None = None
     elevation: RasterInput
     bathymetry: BathymetryInput | None = None
+    optical: OpticalInput | None = None
 
     @model_validator(mode="after")
     def coastline_contract(self) -> "InputsConfig":
@@ -249,6 +252,7 @@ class RegionConfig(StrictModel):
     terrain: TerrainConfig
     quality: QualityConfig
     bathymetry: BathymetryConfig | None = None
+    optical: OpticalConfig | None = None
 
     @field_validator("analysis_crs", "output_crs")
     @classmethod
@@ -270,4 +274,6 @@ class RegionConfig(StrictModel):
             raise ValueError("relief distances cannot exceed inland transect length")
         if (self.inputs.bathymetry is None) != (self.bathymetry is None):
             raise ValueError("inputs.bathymetry and bathymetry must be configured together")
+        if (self.inputs.optical is None) != (self.optical is None):
+            raise ValueError("inputs.optical and optical must be configured together")
         return self
