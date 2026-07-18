@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from coastscan.exceptions import ViewerError
-from coastscan.viewer.data import load_display_transects, load_viewer_data, with_optical_period
+from coastscan.viewer.data import load_display_transects, load_viewer_data
 from coastscan.viewer.filters import apply_filters, reset_filter_state
 from coastscan.viewer.formatting import (
     analytical_csv_table,
@@ -320,6 +320,7 @@ try:
 except ViewerError as exc:
     st.error(str(exc))
     st.stop()
+has_optical = bool(getattr(data, "has_optical", False))
 
 if not data.has_bathymetry:
     st.info(
@@ -327,7 +328,9 @@ if not data.has_bathymetry:
         f"`uv run coastscan build-bathymetry --region {region} --write-samples`"
     )
 
-if data.has_optical:
+if has_optical:
+    from coastscan.viewer.data import with_optical_period
+
     period_labels = {
         "may": "May",
         "june": "June",
@@ -523,7 +526,7 @@ maximum_glint = None
 maximum_shadow = None
 clarity_confidences: list[str] = []
 clarity_qualities: list[str] = []
-if data.has_optical:
+if has_optical:
     with st.sidebar.expander("Optical filters"):
         minimum_valid_scenes = _single_limit(
             "Minimum valid scenes",
