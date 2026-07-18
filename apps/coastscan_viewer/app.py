@@ -595,6 +595,22 @@ if has_optical:
             key="filter_clarity_quality",
         )
 
+optical_filter_arguments = (
+    {
+        "minimum_valid_scenes": minimum_valid_scenes,
+        "minimum_valid_years": minimum_valid_years,
+        "minimum_valid_months": minimum_valid_months,
+        "minimum_clarity_percentile": minimum_clarity,
+        "minimum_clear_water_share": minimum_clear_share,
+        "minimum_clarity_persistence": minimum_persistence,
+        "maximum_glint_exclusion": maximum_glint,
+        "maximum_shadow_exclusion": maximum_shadow,
+        "clarity_confidences": (frozenset(clarity_confidences) if clarity_confidences else None),
+        "clarity_qualities": frozenset(clarity_qualities) if clarity_qualities else None,
+    }
+    if has_optical
+    else {}
+)
 filters = ViewerFilters(
     orientation_statuses=frozenset(orientation) if orientation else None,
     terrain_availability=terrain_availability,
@@ -618,17 +634,8 @@ filters = ViewerFilters(
     gradient_field=gradient_field,
     gradient_range=gradient_range,
     maximum_global_fallback_share=maximum_fallback,
-    minimum_valid_scenes=minimum_valid_scenes,
-    minimum_valid_years=minimum_valid_years,
-    minimum_valid_months=minimum_valid_months,
-    minimum_clarity_percentile=minimum_clarity,
-    minimum_clear_water_share=minimum_clear_share,
-    minimum_clarity_persistence=minimum_persistence,
-    maximum_glint_exclusion=maximum_glint,
-    maximum_shadow_exclusion=maximum_shadow,
-    clarity_confidences=frozenset(clarity_confidences) if clarity_confidences else None,
-    clarity_qualities=frozenset(clarity_qualities) if clarity_qualities else None,
     segment_search=search,
+    **optical_filter_arguments,
 )
 visible = apply_filters(data.display_segments, filters)
 counts = summary_counts(data.display_segments, visible)
