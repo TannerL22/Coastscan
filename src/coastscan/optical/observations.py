@@ -11,10 +11,10 @@ import rasterio
 from rasterio.features import geometry_mask
 from rasterio.warp import reproject
 
-from coastscan.optical.indices import regional_percentiles, summarise_components
-from coastscan.optical.masks import build_masks, validity_reason
+from coastscan.optical.indices import blue_green_ratio, ndti, regional_percentiles
+from coastscan.optical.masks import build_masks, validity_reason_at
 from coastscan.optical.radiometry import Radiometry, reflectance, resampling_for_asset
-from coastscan.optical.texture import texture_strength
+from coastscan.optical.texture import texture_magnitude
 
 
 def _aligned(
@@ -64,11 +64,51 @@ def load_scene_arrays(scene: pd.Series, cache_directory: Path) -> dict[str, np.n
     return arrays
 
 
+GridKey = tuple[int, int, str, tuple[float, ...]]
+ZoneGrid = tuple[gpd.GeoDataFrame, dict[str, np.ndarray]]
+
+
+def _grid_key(reference: rasterio.DatasetReader) -> GridKey:
+    return (
+        reference.height,
+        reference.width,
+        str(reference.crs),
+        tuple(float(value) for value in reference.transform),
+    )
+
+
+def _prepare_zone_grid(zones: gpd.GeoDataFrame, reference: rasterio.DatasetReader) -> ZoneGrid:
+    projected = zones.to_crs(reference.crs)
+    shape = (reference.height, reference.width)
+    indices: dict[str, np.ndarray] = {}
+    for zone in projected.itertuples():
+        zone_id = str(zone.zone_id)
+        if zone.geometry is None or zone.geometry.is_empty or str(zone.zone_status) != "valid":
+            indices[zone_id] = np.array([], dtype=np.int64)
+            continue
+        zone_mask = geometry_mask(
+            [zone.geometry], out_shape=shape, transform=reference.transform, invert=True
+        )
+        indices[zone_id] = np.flatnonzero(zone_mask).astype(np.int64, copy=False)
+    return projected, indices
+
+
+def _share_at(mask: np.ndarray, indices: np.ndarray) -> float:
+    return float(np.mean(mask.ravel()[indices])) if len(indices) else 0.0
+
+
+def _median_at(values: np.ndarray, indices: np.ndarray) -> float:
+    selected = values.ravel()[indices]
+    finite = selected[np.isfinite(selected)]
+    return float(np.median(finite)) if finite.size else float("nan")
+
+
 def scene_observations(
     scene: pd.Series,
     zones: gpd.GeoDataFrame,
     cache_directory: Path,
     settings: Any,
+    zone_grid_cache: dict[GridKey, ZoneGrid] | None = None,
 ) -> list[dict[str, object]]:
     arrays = load_scene_arrays(scene, cache_directory)
     scene_dir = cache_directory / str(scene.scene_id)
@@ -81,9 +121,17 @@ def scene_observations(
             arrays["swir1"],
             arrays["scene_classification"].astype("uint8"),
         )
-        projected = zones.to_crs(reference.crs)
-        transform = reference.transform
-        shape = (reference.height, reference.width)
+        key = _grid_key(reference)
+        cache = zone_grid_cache if zone_grid_cache is not None else {}
+        if key not in cache:
+            cache[key] = _prepare_zone_grid(zones, reference)
+        projected, zone_indices = cache[key]
+    component_arrays = {
+        "blue_green_ratio": blue_green_ratio(arrays["blue"], arrays["green"]),
+        "ndti": ndti(arrays["red"], arrays["green"]),
+        "nir_reflectance": arrays["nir"],
+    }
+    texture = texture_magnitude(arrays["green"])
     records: list[dict[str, object]] = []
     for zone in projected.itertuples():
         base: dict[str, object] = {
@@ -107,29 +155,24 @@ def scene_observations(
             )
             records.append(base)
             continue
-        zone_pixels = geometry_mask(
-            [zone.geometry], out_shape=shape, transform=transform, invert=True
+        indices = zone_indices[str(zone.zone_id)]
+        reason = validity_reason_at(
+            masks, indices, settings.masks.minimum_valid_water_pixels_per_zone
         )
-        reason = validity_reason(
-            masks, zone_pixels, settings.masks.minimum_valid_water_pixels_per_zone
-        )
-        shares = masks.shares(zone_pixels)
-        valid_pixels = zone_pixels & masks.valid_water
-        valid_count = int(valid_pixels.sum())
-        zone_count = int(zone_pixels.sum())
+        shares = masks.shares_at(indices)
+        valid_selector = masks.valid_water.ravel()[indices]
+        valid_indices = indices[valid_selector]
+        valid_count = len(valid_indices)
+        zone_count = len(indices)
         share = valid_count / zone_count if zone_count else 0.0
+        cloud_excluded_share = _share_at(masks.cloud | masks.cirrus, indices)
+        shadow_excluded_share = _share_at(masks.shadow | masks.dark_shadow, indices)
         invalid_reasons: list[str] = []
         if reason != "valid":
             invalid_reasons.append(reason)
-        if (
-            shares["cloud_share"] + shares["cirrus_share"]
-            > settings.masks.maximum_cloud_excluded_share
-        ):
+        if cloud_excluded_share > settings.masks.maximum_cloud_excluded_share:
             invalid_reasons.append("cloud_contaminated")
-        if (
-            shares["shadow_share"] + shares["dark_shadow_share"]
-            > settings.masks.maximum_shadow_excluded_share
-        ):
+        if shadow_excluded_share > settings.masks.maximum_shadow_excluded_share:
             invalid_reasons.append("shadow_contaminated")
         if shares["glint_risk_share"] > settings.masks.maximum_glint_excluded_share:
             invalid_reasons.append("glint_contaminated")
@@ -155,17 +198,18 @@ def scene_observations(
             observation_invalid_reasons="" if valid else ";".join(dict.fromkeys(invalid_reasons)),
             valid_pixel_count=valid_count,
             zone_pixel_count=zone_count,
-            water_pixel_count=int((zone_pixels & masks.spectral_water).sum()),
+            water_pixel_count=int(masks.spectral_water.ravel()[indices].sum()),
             valid_pixel_share=share,
+            total_excluded_share=1.0 - share,
             water_mask_method="vector-land exclusion plus green/NIR/SWIR spectral validation v1",
             water_mask_valid_share=shares["spectral_water_share"],
             land_mixed_pixel_share=shares["land_share"],
-            cloud_excluded_share=shares["cloud_share"] + shares["cirrus_share"],
+            cloud_excluded_share=cloud_excluded_share,
             cloud_excluded_pixel_share=shares["cloud_share"],
             cloud_shadow_excluded_pixel_share=shares["shadow_share"],
             cirrus_excluded_pixel_share=shares["cirrus_share"],
             invalid_excluded_pixel_share=shares["invalid_input_share"],
-            shadow_excluded_share=shares["shadow_share"] + shares["dark_shadow_share"],
+            shadow_excluded_share=shadow_excluded_share,
             dark_shadow_excluded_pixel_share=shares["dark_shadow_share"],
             dark_shadow_risk=shares["dark_shadow_share"] > 0.1,
             glint_excluded_share=shares["glint_risk_share"],
@@ -176,10 +220,10 @@ def scene_observations(
             whitewater_excluded_share=shares["whitewater_share"],
             whitewater_excluded_pixel_share=shares["whitewater_share"],
             whitewater_risk=shares["whitewater_share"] > 0.1,
-            **summarise_components(
-                arrays["blue"], arrays["green"], arrays["red"], arrays["nir"], valid_pixels
-            ),
-            apparent_texture_strength=texture_strength(arrays["green"], valid_pixels),
+            **{
+                name: _median_at(values, valid_indices) for name, values in component_arrays.items()
+            },
+            apparent_texture_strength=_median_at(texture, valid_indices),
         )
         records.append(base)
     return records
@@ -192,10 +236,19 @@ def extract_observations(
     settings: Any,
 ) -> pd.DataFrame:
     records: list[dict[str, object]] = []
+    zone_grid_cache: dict[GridKey, ZoneGrid] = {}
     for _, scene in (
         scenes.loc[scenes.selected].sort_values(["acquisition_datetime_utc", "scene_id"]).iterrows()
     ):
-        records.extend(scene_observations(scene, zones, cache_directory, settings))
+        records.extend(
+            scene_observations(
+                scene,
+                zones,
+                cache_directory,
+                settings,
+                zone_grid_cache=zone_grid_cache,
+            )
+        )
     frame = pd.DataFrame.from_records(records)
     if frame.empty:
         return frame
@@ -208,6 +261,7 @@ def extract_observations(
         "zone_pixel_count",
         "water_pixel_count",
         "valid_pixel_share",
+        "total_excluded_share",
         "water_mask_valid_share",
         "land_mixed_pixel_share",
         "cloud_excluded_share",

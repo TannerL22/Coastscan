@@ -7,6 +7,7 @@ from pathlib import Path
 import geopandas as gpd
 import rasterio
 from rasterio.mask import mask
+from rasterio.session import AWSSession
 
 from coastscan.catalog.manifests import sha256_file
 from coastscan.config import PROJECT_ROOT, load_region_config
@@ -23,12 +24,16 @@ def _vsi_path(href: str) -> str:
 
 
 def _atomic_clip(
-    href: str, destination: Path, aoi: gpd.GeoDataFrame, options: dict[str, object]
+    href: str,
+    destination: Path,
+    aoi: gpd.GeoDataFrame,
+    session: AWSSession,
+    options: dict[str, object],
 ) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_suffix(".part.tif")
     try:
-        with rasterio.Env(**options), rasterio.open(_vsi_path(href)) as source:
+        with rasterio.Env(session=session, **options), rasterio.open(_vsi_path(href)) as source:
             projected = aoi.to_crs(source.crs)
             values, transform = mask(source, projected.geometry, crop=True, filled=True)
             profile = source.profile.copy()
@@ -47,6 +52,13 @@ def _atomic_clip(
     except Exception as exc:
         temporary.unlink(missing_ok=True)
         raise AcquisitionError(f"Official Copernicus asset read failed for {href}: {exc}") from exc
+
+
+def _write_acquisition_manifest(path: Path, manifest: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".part.json")
+    temporary.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+    os.replace(temporary, path)
 
 
 def acquire_optical(
@@ -74,6 +86,8 @@ def acquire_optical(
     aoi_path = root / config.area_of_interest.path
     aoi = gpd.read_file(aoi_path, layer=config.area_of_interest.layer)
     cache = root / "data" / "interim" / config.region_id / "optical" / "clips"
+    rasterio_session = credentials.rasterio_session(source.s3_endpoint)
+    rasterio_options = credentials.rasterio_options()
     manifest_path = acquisition_manifest_path(root, config.region_id)
     previous_files: dict[tuple[str, str], dict[str, object]] = {}
     if manifest_path.is_file():
@@ -89,6 +103,27 @@ def acquire_optical(
             }
     files: list[dict[str, object]] = []
     asset_columns = [f"asset_{role}" for role in CLIP_ROLES]
+
+    def checkpoint(*, complete: bool) -> dict[str, object]:
+        manifest: dict[str, object] = {
+            "region_id": config.region_id,
+            "provider": "Copernicus Data Space Ecosystem",
+            "catalogue_checksum": metadata.get("catalogue_checksum"),
+            "query_fingerprint": metadata.get("query_fingerprint"),
+            "scene_count": len(selected),
+            "expected_file_count": len(selected) * len(CLIP_ROLES),
+            "files": files,
+            "actual_cache_bytes": sum(
+                destination.stat().st_size for destination in cache.glob("*/*.tif")
+            ),
+            "estimated_clipped_bytes": estimated_clipped_bytes,
+            "configured_cache_limit_bytes": cache_limit,
+            "complete": complete,
+            "secrets_recorded": False,
+        }
+        _write_acquisition_manifest(manifest_path, manifest)
+        return manifest
+
     for row in selected.itertuples():
         for column in asset_columns:
             href = str(getattr(row, column))
@@ -103,7 +138,11 @@ def acquire_optical(
             )
             if not cached_valid:
                 _atomic_clip(
-                    href, destination, aoi, credentials.rasterio_options(source.s3_endpoint)
+                    href,
+                    destination,
+                    aoi,
+                    rasterio_session,
+                    rasterio_options,
                 )
             metadata_role = "scene_classification" if role == "scl" else role
             source_metadata = json.loads(str(row.asset_checksums_or_etags)).get(metadata_role, {})
@@ -119,28 +158,12 @@ def acquire_optical(
                     "source_asset_size": source_metadata.get("file_size"),
                 }
             )
-            actual_bytes = sum(path.stat().st_size for path in cache.glob("*/*.tif"))
+            manifest = checkpoint(complete=False)
+            actual_bytes = int(str(manifest["actual_cache_bytes"]))
             if actual_bytes > cache_limit:
                 raise AcquisitionError(
                     "Optical cache exceeded its configured ceiling; completed clips remain "
                     "recoverable and no source imagery was committed."
                 )
-    manifest = {
-        "region_id": config.region_id,
-        "provider": "Copernicus Data Space Ecosystem",
-        "catalogue_checksum": metadata.get("catalogue_checksum"),
-        "query_fingerprint": metadata.get("query_fingerprint"),
-        "scene_count": len(selected),
-        "files": files,
-        "actual_cache_bytes": sum(
-            destination.stat().st_size for destination in cache.glob("*/*.tif")
-        ),
-        "estimated_clipped_bytes": estimated_clipped_bytes,
-        "configured_cache_limit_bytes": cache_limit,
-        "secrets_recorded": False,
-    }
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_manifest = manifest_path.with_suffix(".part.json")
-    temporary_manifest.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
-    os.replace(temporary_manifest, manifest_path)
+    manifest = checkpoint(complete=True)
     return manifest

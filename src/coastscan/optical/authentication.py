@@ -3,6 +3,8 @@
 import os
 from dataclasses import dataclass
 
+from rasterio.session import AWSSession
+
 from coastscan.exceptions import AcquisitionError
 
 ACCESS_KEY_ENV = "COPERNICUS_S3_ACCESS_KEY"
@@ -17,15 +19,21 @@ class CopernicusS3Credentials:
     def __repr__(self) -> str:
         return "CopernicusS3Credentials(access_key=<redacted>, secret_key=<redacted>)"
 
-    def rasterio_options(self, endpoint: str) -> dict[str, object]:
-        host = endpoint.removeprefix("https://").removeprefix("http://").rstrip("/")
+    def rasterio_session(self, endpoint: str) -> AWSSession:
+        """Create the boto3-backed Rasterio session required by Rasterio 1.5+."""
+        endpoint_url = endpoint.rstrip("/")
+        return AWSSession(
+            aws_access_key_id=self.access_key,
+            aws_secret_access_key=self.secret_key,
+            region_name="default",
+            endpoint_url=endpoint_url,
+        )
+
+    def rasterio_options(self) -> dict[str, object]:
+        """Non-secret GDAL S3 options used alongside the boto3 session."""
         return {
-            "AWS_ACCESS_KEY_ID": self.access_key,
-            "AWS_SECRET_ACCESS_KEY": self.secret_key,
-            "AWS_S3_ENDPOINT": host,
             "AWS_HTTPS": "YES",
             "AWS_VIRTUAL_HOSTING": "FALSE",
-            "AWS_REGION": "default",
         }
 
 

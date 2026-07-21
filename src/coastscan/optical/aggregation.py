@@ -51,11 +51,18 @@ def aggregate_periods(
             mask_columns = [
                 str(name) for name in group.columns if str(name).endswith("_excluded_share")
             ]
-            burden = (
-                float(group[mask_columns].fillna(0).sum(axis=1).clip(upper=1).mean())
-                if mask_columns
-                else 0.0
-            )
+            if "total_excluded_share" in group:
+                burden = float(
+                    pd.to_numeric(group.total_excluded_share, errors="coerce")
+                    .clip(lower=0, upper=1)
+                    .mean()
+                )
+            else:
+                burden = (
+                    float(group[mask_columns].fillna(0).sum(axis=1).clip(upper=1).mean())
+                    if mask_columns
+                    else 0.0
+                )
             valid_share = float(len(valid) / len(group)) if len(group) else 0.0
             confidence = classify_confidence(
                 valid_scenes=int(valid.scene_id.nunique()),

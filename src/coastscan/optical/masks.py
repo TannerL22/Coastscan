@@ -46,6 +46,26 @@ class OpticalMasks:
             for name in names
         }
 
+    def shares_at(self, indices: NDArray[np.integer]) -> dict[str, float]:
+        """Return mask shares for sparse flat zone indices without allocating a full grid mask."""
+        names = (
+            "spectral_water",
+            "cloud",
+            "shadow",
+            "cirrus",
+            "land",
+            "dark_shadow",
+            "whitewater",
+            "glint_risk",
+            "invalid_input",
+            "valid_water",
+        )
+        if not len(indices):
+            return {f"{name}_share": 0.0 for name in names}
+        return {
+            f"{name}_share": float(np.mean(getattr(self, name).ravel()[indices])) for name in names
+        }
+
 
 def _finite(*bands: NDArray[np.floating]) -> NDArray[np.bool_]:
     result = np.ones(bands[0].shape, dtype=bool)
@@ -72,12 +92,19 @@ def build_masks(
     land = np.isin(scl, list(SCL_LAND_OR_INVALID))
     if vector_land is not None:
         land |= vector_land
-    water_like = (green > nir * 1.05) & (green > swir1 * 1.15)
-    dark_shadow = water_like & (blue + green + red < 0.045)
-    whiteness = np.maximum.reduce([blue, green, red]) - np.minimum.reduce([blue, green, red])
-    whitewater = water_like & (green > 0.12) & (whiteness < 0.035) & (nir > 0.04)
-    glint_risk = (green > swir1) & (nir > 0.06) & (swir1 > 0.025) & (nir / (green + 1e-6) > 0.45)
     invalid_input = ~finite
+    water_like = (green > nir * 1.05) & (green > swir1 * 1.15)
+    scl_usable_water = water_like & ~(cloud | shadow | cirrus | land | invalid_input)
+    dark_shadow = scl_usable_water & (blue + green + red < 0.045)
+    whiteness = np.maximum.reduce([blue, green, red]) - np.minimum.reduce([blue, green, red])
+    whitewater = scl_usable_water & (green > 0.12) & (whiteness < 0.035) & (nir > 0.04)
+    glint_risk = (
+        scl_usable_water
+        & (green > swir1)
+        & (nir > 0.06)
+        & (swir1 > 0.025)
+        & (nir / (green + 1e-6) > 0.45)
+    )
     excluded = (
         cloud | shadow | cirrus | land | dark_shadow | whitewater | glint_risk | invalid_input
     )
@@ -97,13 +124,28 @@ def build_masks(
 
 
 def validity_reason(masks: OpticalMasks, zone: NDArray[np.bool_], minimum_pixels: int) -> str:
-    if not int(zone.sum()):
+    return validity_reason_at(masks, np.flatnonzero(zone), minimum_pixels)
+
+
+def validity_reason_at(
+    masks: OpticalMasks, indices: NDArray[np.integer], minimum_pixels: int
+) -> str:
+    if not len(indices):
         return "empty_zone"
-    if int((zone & masks.valid_water).sum()) < minimum_pixels:
-        burdens = masks.shares(zone)
-        dominant = max(
-            (name for name in burdens if name != "valid_water_share"),
-            key=burdens.__getitem__,
-        )
-        return f"insufficient_valid_pixels:{dominant.removesuffix('_share')}"
+    valid_count = int(masks.valid_water.ravel()[indices].sum())
+    if valid_count < minimum_pixels:
+        shares = masks.shares_at(indices)
+        exclusions = {
+            "cloud": shares["cloud_share"],
+            "shadow": shares["shadow_share"],
+            "cirrus": shares["cirrus_share"],
+            "land": shares["land_share"],
+            "dark_shadow": shares["dark_shadow_share"],
+            "whitewater": shares["whitewater_share"],
+            "glint_risk": shares["glint_risk_share"],
+            "invalid_input": shares["invalid_input_share"],
+            "non_spectral_water": 1.0 - shares["spectral_water_share"],
+        }
+        dominant = max(exclusions, key=exclusions.__getitem__)
+        return f"insufficient_valid_pixels:{dominant}"
     return "valid"

@@ -66,23 +66,27 @@ def test_masks_preserve_cloud_shadow_land_glint_whitewater_and_reason() -> None:
     swir = np.full(shape, 0.005)
     scl = np.full(shape, 6, dtype="uint8")
     scl[0, 0] = 9
+    green[0, 0], nir[0, 0], swir[0, 0] = 0.10, 0.07, 0.03
     scl[0, 1] = 3
     scl[0, 2] = 5
-    nir[0, 3], swir[0, 3] = 0.08, 0.03
+    green[0, 3], nir[0, 3], swir[0, 3] = 0.10, 0.08, 0.03
     blue[1, 0], green[1, 0], red[1, 0], nir[1, 0] = 0.15, 0.16, 0.15, 0.06
     blue[1, 1], green[1, 1], red[1, 1] = 0.01, 0.01, 0.01
     nir[1, 1], swir[1, 1] = 0.001, 0.001
     masks = build_masks(blue, green, red, nir, swir, scl)
     assert masks.cloud[0, 0]
+    assert not masks.glint_risk[0, 0]
     assert masks.shadow[0, 1]
     assert masks.land[0, 2]
     assert masks.glint_risk[0, 3]
     assert masks.whitewater[1, 0]
     assert masks.dark_shadow[1, 1]
     assert masks.valid_water[1, 2]
-    assert validity_reason(masks, np.ones(shape, dtype=bool), 3).startswith(
-        "insufficient_valid_pixels"
-    )
+    reason = validity_reason(masks, np.ones(shape, dtype=bool), 3)
+    assert reason.startswith("insufficient_valid_pixels")
+    assert reason != "insufficient_valid_pixels:spectral_water"
+    shares = masks.shares_at(np.arange(np.prod(shape)))
+    assert all(0.0 <= value <= 1.0 for value in shares.values())
 
 
 def test_indices_are_numerically_stable_and_directional() -> None:
@@ -237,12 +241,28 @@ def test_authentication_is_runtime_only_and_redacted(monkeypatch: pytest.MonkeyP
     assert authentication_status()["ready"] is False
     with pytest.raises(AcquisitionError, match="generated CDSE S3 credentials"):
         require_s3_credentials()
+    calls: list[dict[str, object]] = []
+
+    def fake_session(**kwargs: object) -> object:
+        calls.append(kwargs)
+        return object()
+
+    monkeypatch.setattr("coastscan.optical.authentication.AWSSession", fake_session)
     credentials = CopernicusS3Credentials("visible-key", "visible-secret")
     assert "visible" not in repr(credentials)
-    assert (
-        credentials.rasterio_options("https://example.invalid")["AWS_S3_ENDPOINT"]
-        == "example.invalid"
-    )
+    assert credentials.rasterio_session("https://example.invalid/") is not None
+    assert calls == [
+        {
+            "aws_access_key_id": "visible-key",
+            "aws_secret_access_key": "visible-secret",
+            "region_name": "default",
+            "endpoint_url": "https://example.invalid",
+        }
+    ]
+    assert credentials.rasterio_options() == {
+        "AWS_HTTPS": "YES",
+        "AWS_VIRTUAL_HOSTING": "FALSE",
+    }
 
 
 def test_monthly_seasonal_aggregation_confidence_and_headline() -> None:
@@ -368,6 +388,12 @@ def test_acquisition_cache_verifies_every_selected_asset_and_output(
     with pytest.raises(AcquisitionError, match="changed"):
         validate_acquisition_cache(tmp_path, "demo", selected, catalogue_checksum="catalogue-sha")
 
+    partial = json.loads(manifest_path.read_text(encoding="utf-8"))
+    partial["complete"] = False
+    manifest_path.write_text(json.dumps(partial), encoding="utf-8")
+    with pytest.raises(AcquisitionError, match="incomplete"):
+        validate_acquisition_cache(tmp_path, "demo", selected, catalogue_checksum="catalogue-sha")
+
 
 def test_synthetic_scene_extraction_aligns_10m_and_20m_assets(tmp_path: Path) -> None:
     cache = tmp_path / "clips"
@@ -445,6 +471,8 @@ def test_synthetic_scene_extraction_aligns_10m_and_20m_assets(tmp_path: Path) ->
     assert observations.valid_clarity_component_count.eq(3).all()
     assert observations.clarity_percentile.notna().all()
     assert observations.sort_values("segment_id").clarity_percentile.is_monotonic_increasing
+    assert observations.total_excluded_share.between(0, 1).all()
+    assert observations.shadow_excluded_share.between(0, 1).all()
     assert {
         "zone_class",
         "water_pixel_count",

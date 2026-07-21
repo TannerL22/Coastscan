@@ -30,7 +30,7 @@ from coastscan.optical.qa import (
 )
 from coastscan.optical.zones import zones_for_region
 
-ALGORITHM_VERSION = "phase3-relative-clarity-2"
+ALGORITHM_VERSION = "phase3-relative-clarity-3"
 PROTECTED_FILES = (
     "coast_segments.parquet",
     "segment_features.parquet",
@@ -282,10 +282,10 @@ def build_clarity(
         radiometric_method="per-asset STAC scale and offset; nodata preserved",
         mask_method_versions={
             "scl": "scl-classes-v1",
-            "spectral_water": "green-nir-swir-v1",
-            "dark_shadow": "dark-water-v1",
-            "whitewater": "visible-whiteness-v1",
-            "glint_risk": "nir-swir-v1",
+            "spectral_water": "green-nir-swir-v2",
+            "dark_shadow": "scl-gated-dark-water-v2",
+            "whitewater": "scl-gated-visible-whiteness-v2",
+            "glint_risk": "scl-water-gated-nir-swir-v2",
             "vector_land": "authoritative-land-buffer-v1",
         },
         clarity_formula=(

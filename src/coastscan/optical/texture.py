@@ -4,10 +4,14 @@ import numpy as np
 from numpy.typing import NDArray
 
 
-def texture_strength(image: NDArray[np.floating], valid: NDArray[np.bool_]) -> float:
+def texture_magnitude(image: NDArray[np.floating]) -> NDArray[np.float64]:
     values = np.asarray(image, dtype=float)
     gy, gx = np.gradient(values)
-    magnitude = np.hypot(gx, gy)
+    return np.asarray(np.hypot(gx, gy), dtype=np.float64)
+
+
+def texture_strength(image: NDArray[np.floating], valid: NDArray[np.bool_]) -> float:
+    magnitude = texture_magnitude(image)
     selected = magnitude[valid & np.isfinite(magnitude)]
     return float(np.nanmedian(selected)) if selected.size else float("nan")
 

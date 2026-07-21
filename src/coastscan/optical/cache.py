@@ -65,6 +65,10 @@ def validate_acquisition_cache(
     manifest = read_acquisition_manifest(path)
     if manifest.get("region_id") != region_id:
         raise AcquisitionError("Optical acquisition manifest region does not match the build")
+    if manifest.get("complete") is False:
+        raise AcquisitionError(
+            "Optical acquisition is incomplete. Re-run acquire-optical to resume verified clips."
+        )
     if manifest.get("catalogue_checksum") != catalogue_checksum:
         raise AcquisitionError(
             "Optical acquisition manifest is stale relative to the selected scene catalogue. "
